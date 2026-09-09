@@ -1,0 +1,6 @@
+.DS_Store
+*.icloud
+.Trashes
+._*
+node_modules
+_site

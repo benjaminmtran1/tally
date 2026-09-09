@@ -1,0 +1,13 @@
+{
+  "name": "Tally — lumber & materials calculator",
+  "short_name": "Tally",
+  "description": "Price out a build against supplier price lists.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef1f5",
+  "theme_color": "#eef1f5",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

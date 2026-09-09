@@ -1,0 +1,2736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#eef1f5">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Tally — lumber &amp; materials calculator</title>
+<style>
+/* ============ RESET & THEME (shared kit with SetDraft) ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg-dark: #eef1f5;
+  --bg-panel: #ffffff;
+  --bg-canvas: #f6f7f9;
+  --bg-input: #f1f4f8;
+  --primary: #1a73e8;
+  --primary-soft: #e8f0fe;
+  --accent: #e0455a;
+  --accent2: #f1f4f8;
+  --accent3: #e2e8f0;
+  --text: #1c2430;
+  --text-dim: #6b7787;
+  --border: #e3e8ef;
+  --green: #15803d;
+  --yellow: #b45309;
+  --blue: #0369a1;
+  --cyan: #0e7490;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 4px 14px rgba(16,24,40,.07);
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --row: 19px;
+}
+html, body { height: 100%; }
+body {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.35;
+  background: var(--bg-dark);
+  color: var(--text);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+button, input, select, textarea {
+  font-family: inherit; font-size: inherit; color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+button { cursor: pointer; border: none; background: none; }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.dim { color: var(--text-dim); }
+.hide { display: none !important; }
+
+/* ============ TOP BAR ============ */
+#top {
+  flex-shrink: 0; background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px; height: 46px;
+  display: flex; align-items: center; gap: 14px;
+}
+.brand { font-weight: 700; letter-spacing: 1.6px; font-size: 12px; }
+.brand em { font-style: normal; color: var(--text-dim); font-weight: 400; letter-spacing: 0; margin-left: 6px; font-size: 10px; }
+#jobName {
+  font-weight: 600; font-size: 12.5px; background: transparent;
+  border: 1px solid transparent; border-radius: 4px; padding: 3px 6px; min-width: 150px;
+}
+#jobName:hover { border-color: var(--border); }
+#jobName:focus { outline: none; border-color: var(--primary); background: #fff; }
+.spring { flex: 1; }
+.srcline { color: var(--text-dim); font-size: 10.5px; letter-spacing: .2px; }
+.ctl { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-dim); }
+.ctl label { letter-spacing: .5px; text-transform: uppercase; font-size: 9.5px; }
+.pill {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 6px; display: flex; align-items: center; gap: 1px;
+}
+.pill button { padding: 1px 6px; border-radius: 3px; color: var(--text-dim); font-size: 10.5px; }
+.pill button.on { background: var(--bg-panel); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+input.mini {
+  width: 44px; background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 4px; text-align: right;
+}
+input.mini:focus { outline: none; border-color: var(--primary); background: #fff; }
+.btn {
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px;
+  padding: 4px 9px; font-size: 10.5px; letter-spacing: .3px; box-shadow: var(--shadow);
+}
+.btn:hover { background: var(--bg-input); }
+.btn.pri { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn.pri:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+/* ============ TABS ============ */
+#tabs {
+  flex-shrink: 0; display: flex; align-items: stretch; gap: 0;
+  background: var(--bg-panel); border-bottom: 1px solid var(--border); padding: 0 12px;
+}
+.tab {
+  padding: 6px 13px; font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase;
+  color: var(--text-dim); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--text); border-bottom-color: var(--primary); font-weight: 700; }
+.tab .badge { color: var(--text-dim); font-weight: 400; margin-left: 4px; letter-spacing: 0; }
+
+/* ============ MAIN ============ */
+#main { flex: 1; display: flex; min-height: 0; }
+#pane { flex: 1; min-width: 0; overflow: auto; background: var(--bg-canvas); }
+#rail {
+  width: 232px; flex-shrink: 0; border-left: 1px solid var(--border);
+  background: var(--bg-panel); overflow: auto; padding: 0 0 20px;
+}
+.panel { border-bottom: 1px solid var(--border); padding: 9px 11px 11px; }
+.panel h3 {
+  font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--text-dim); font-weight: 600; margin-bottom: 7px;
+}
+
+/* ============ TABLES ============ */
+table.grid { width: 100%; border-collapse: collapse; font-size: 11px; }
+table.grid th {
+  position: sticky; top: 0; z-index: 2; background: var(--bg-panel);
+  text-align: left; font-weight: 600; font-size: 9.5px; letter-spacing: .9px;
+  text-transform: uppercase; color: var(--text-dim);
+  padding: 6px 7px; border-bottom: 1px solid var(--accent3); white-space: nowrap;
+}
+table.grid th.num, table.grid td.num { text-align: right; }
+table.grid td {
+  padding: 2px 7px; border-bottom: 1px solid var(--border);
+  height: var(--row); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+table.grid tbody tr:hover td { background: var(--primary-soft); }
+table.grid tbody tr.sel td { background: var(--primary-soft); box-shadow: inset 2px 0 0 var(--primary); }
+table.grid tr.grp td {
+  background: var(--bg-input); font-size: 9.5px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-dim); font-weight: 600; height: 17px;
+}
+table.grid td.code { color: var(--blue); }
+table.grid td.wide { white-space: normal; }
+.tblwrap { padding: 0 0 40px; }
+.empty { padding: 34px 20px; text-align: center; color: var(--text-dim); font-size: 11.5px; line-height: 1.9; }
+.empty b { display: block; font-size: 12.5px; color: var(--text); margin-bottom: 8px; letter-spacing: .4px; }
+
+/* section head inside a pane */
+.shead {
+  position: sticky; top: 0; z-index: 3; background: var(--bg-canvas);
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 11px 7px; border-bottom: 1px solid var(--border);
+}
+.shead h2 { font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-dim); font-weight: 600; }
+.shead .n { color: var(--text-dim); font-size: 10.5px; }
+input.search {
+  flex: 1; max-width: 320px; background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 8px;
+}
+input.search:focus { outline: none; border-color: var(--primary); }
+
+/* editable cell */
+.ed { border-bottom: 1px dotted var(--text-dim); cursor: text; }
+.ed:hover { background: #fff; }
+input.cell {
+  width: 100%; background: #fff; border: 1px solid var(--primary);
+  border-radius: 3px; padding: 1px 4px; text-align: inherit;
+}
+input.cell:focus { outline: none; }
+select.cell { background: #fff; border: 1px solid var(--border); border-radius: 3px; padding: 1px 3px; }
+
+/* ============ METERS ============ */
+.meter { margin-bottom: 9px; }
+.meter .lbl { display: flex; justify-content: space-between; gap: 6px; font-size: 10.5px; margin-bottom: 2px; }
+.meter .lbl b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { height: 7px; background: var(--accent3); border-radius: 1px; overflow: hidden; display: flex; }
+.bar i { display: block; background: var(--primary); height: 100%; }
+.bar i.warn { background: var(--yellow); }
+.bar i.bad { background: var(--accent); }
+.bar i.good { background: var(--green); }
+.meter .sub { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+.kv { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; font-size: 11px; }
+.kv .k { color: var(--text-dim); }
+.kv.tot { border-top: 1px solid var(--accent3); margin-top: 5px; padding-top: 5px; font-weight: 700; font-size: 12.5px; }
+.kv.sub2 { font-size: 10.5px; color: var(--text-dim); }
+.flag {
+  display: block; margin-top: 6px; padding: 5px 7px; border-radius: 4px;
+  background: #fff5ed; border: 1px solid #f3d3ae; color: #8a4b09; font-size: 10.5px; line-height: 1.45;
+}
+.flag.bad { background: #fdf0f1; border-color: #f2c4ca; color: #97253a; }
+.tag {
+  display: inline-block; padding: 0 4px; border-radius: 3px; font-size: 9.5px;
+  background: var(--bg-input); color: var(--text-dim); border: 1px solid var(--border);
+}
+.tag.r { background: var(--primary-soft); color: var(--primary); border-color: #cadffb; }
+
+/* ============ ENTRIES STRIP ============ */
+#entries { border-top: 1px solid var(--border); background: var(--bg-panel); }
+.entry {
+  display: flex; align-items: center; gap: 9px; padding: 4px 11px;
+  border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.entry:hover { background: var(--bg-input); }
+.entry .x { color: var(--text-dim); padding: 0 3px; }
+.entry .x:hover { color: var(--accent); }
+
+/* ============ MODAL ============ */
+#veil {
+  position: fixed; inset: 0; background: rgba(20,28,38,.42); z-index: 90;
+  display: flex; align-items: center; justify-content: center; padding: 26px;
+}
+.modal {
+  background: var(--bg-panel); border-radius: 8px; box-shadow: 0 18px 50px rgba(16,24,40,.28);
+  display: flex; flex-direction: column; max-height: 100%; width: 100%; max-width: 940px; overflow: hidden;
+}
+.modal.sm { max-width: 470px; }
+.modal.md { max-width: 680px; }
+.mhead {
+  padding: 11px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.mhead h2 { font-size: 11.5px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 700; }
+.mbody { padding: 13px 14px; overflow: auto; flex: 1; }
+.mbody.flush { padding: 0; }
+.mfoot {
+  padding: 10px 14px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0; background: var(--bg-canvas);
+}
+.field { margin-bottom: 10px; }
+.field > label {
+  display: block; font-size: 9.5px; letter-spacing: 1.1px; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 3px; font-weight: 600;
+}
+.field input[type=text], .field input[type=number], .field select, .field textarea {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 4px; padding: 5px 8px;
+}
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--primary); background: #fff; }
+.field .hint { font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+.cols { display: flex; gap: 10px; }
+.cols > * { flex: 1; }
+.drop {
+  border: 1.5px dashed var(--accent3); border-radius: 7px; padding: 22px;
+  text-align: center; color: var(--text-dim); line-height: 1.9;
+}
+.drop.hot { border-color: var(--primary); background: var(--primary-soft); color: var(--primary); }
+textarea.paste { min-height: 150px; font-size: 10.5px; line-height: 1.5; white-space: pre; }
+pre.log {
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 5px;
+  padding: 9px; font-size: 10.5px; line-height: 1.6; overflow: auto; max-height: 340px; white-space: pre-wrap;
+}
+pre.log b.ok { color: var(--green); }
+pre.log b.no { color: var(--accent); }
+
+/* ============ TOAST / STATUS ============ */
+#status {
+  flex-shrink: 0; height: 22px; background: var(--bg-panel); border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; padding: 0 12px; font-size: 10.5px; color: var(--text-dim);
+}
+#toast {
+  position: fixed; left: 50%; bottom: 42px; transform: translateX(-50%);
+  background: #1c2430; color: #fff; padding: 7px 14px; border-radius: 5px;
+  font-size: 11px; z-index: 120; box-shadow: 0 6px 22px rgba(16,24,40,.3);
+  opacity: 0; pointer-events: none; transition: opacity .16s;
+}
+#toast.on { opacity: 1; }
+kbd {
+  background: var(--bg-input); border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 3px; padding: 0 4px; font-size: 10px; font-family: var(--mono);
+}
+</style>
+</head>
+<body>
+
+<div id="top">
+  <div class="brand">TALLY<em>v1</em></div>
+  <input id="jobName" placeholder="Untitled job" spellcheck="false">
+  <div class="srcline" id="srcline">no catalog</div>
+  <div class="spring"></div>
+  <div class="ctl">
+    <label>waste</label>
+    <input class="mini" id="globalWaste" value="10"><span>%</span>
+  </div>
+  <div class="ctl">
+    <label>units</label>
+    <span class="pill">
+      <button id="uFrac" class="on">frac</button><button id="uDec">dec</button>
+    </span>
+  </div>
+  <button class="btn" id="btnSnap">snapshot</button>
+  <button class="btn" id="btnCompare">compare</button>
+  <button class="btn" id="btnJobs">jobs</button>
+</div>
+
+<div id="tabs">
+  <button class="tab on" data-tab="job">Job</button>
+  <button class="tab" data-tab="catalog">Catalog<span class="badge" id="bCat"></span></button>
+  <button class="tab" data-tab="recipes">Recipes<span class="badge" id="bRec"></span></button>
+  <button class="tab" data-tab="cutlist">Cut&nbsp;List</button>
+  <button class="tab" data-tab="vendors">Vendors<span class="badge" id="bVen"></span></button>
+  <div class="spring"></div>
+  <button class="tab" id="btnHelp">?</button>
+</div>
+
+<div id="main">
+  <div id="pane"></div>
+  <div id="rail"></div>
+</div>
+
+<div id="status">
+  <span id="stMsg">ready</span>
+  <div class="spring"></div>
+  <span id="stStore" class="dim"></span>
+</div>
+
+<div id="toast"></div>
+<div id="veil" class="hide"></div>
+
+<script>
+'use strict';
+/* ==================================================================
+   TALLY v1 — lumber & materials calculator
+   Single file, no build step, no dependencies.
+   Sections:  UNITS · STORE · PDF · INFER · CLASSES · MATH · NEST
+              · RECIPES · UI · TESTS
+   ================================================================== */
+
+/* ============ SMALL HELPERS ============ */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const money = (n) => (n == null || isNaN(n)) ? '—'
+  : (n < 0 ? '-' : '') + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+function toast(msg, ms) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms || 2200);
+}
+function setStatus(msg) { $('#stMsg').textContent = msg; }
+
+/* ==================================================================
+   UNITS
+   Everything is stored as decimal FEET. Display only is toggled.
+   ================================================================== */
+
+const VULGAR = { 0.5: '½', 0.25: '¼', 0.75: '¾',
+  0.125: '⅛', 0.375: '⅜', 0.625: '⅝', 0.875: '⅞',
+  0.3333333333333333: '⅓', 0.6666666666666666: '⅔' };
+
+// "6 1/2" -> 6.5   "1/2" -> 0.5   "6-1/2" -> 6.5   "6.5" -> 6.5
+function parseNumFrac(str) {
+  if (str == null) return null;
+  let s = String(str).trim().replace(/⁄/g, '/');
+  if (!s) return null;
+  // unicode vulgar fractions
+  s = s.replace(/[¼½¾⅛⅜⅝⅞⅓⅔]/g, (c) => {
+    const m = { '¼': ' 1/4', '½': ' 1/2', '¾': ' 3/4', '⅛': ' 1/8',
+      '⅜': ' 3/8', '⅝': ' 5/8', '⅞': ' 7/8', '⅓': ' 1/3', '⅔': ' 2/3' };
+    return m[c];
+  }).trim();
+  let m = s.match(/^([+-]?\d+(?:\.\d+)?)[\s-]+(\d+)\s*\/\s*(\d+)$/);   // 6 1/2
+  if (m) {
+    const whole = parseFloat(m[1]), den = parseFloat(m[3]);
+    if (!den) return null;
+    return whole + (whole < 0 ? -1 : 1) * (parseFloat(m[2]) / den);
+  }
+  m = s.match(/^([+-]?\d+)\s*\/\s*(\d+)$/);                             // 1/2
+  if (m) { const den = parseFloat(m[2]); return den ? parseFloat(m[1]) / den : null; }
+  m = s.match(/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/);                        // 6.5
+  if (m) return parseFloat(s);
+  return null;
+}
+
+// Length input -> decimal feet. Bare numbers mean FEET.
+//   "4'6 1/2"  "4' 6-1/2\""  "4-6"  "54.5\""  "10'"  "4.54"  "264"
+function parseLen(str) {
+  if (str == null) return null;
+  if (typeof str === 'number') return isFinite(str) ? str : null;
+  let s = String(str).trim().toLowerCase().replace(/’/g, "'").replace(/[”″]/g, '"');
+  if (!s) return null;
+  s = s.replace(/\bfeet\b|\bfoot\b|\bft\b/g, "'").replace(/\binches\b|\binch\b|\bin\b/g, '"');
+  const neg = /^-/.test(s); if (neg) s = s.slice(1).trim();
+  let val = null;
+
+  if (s.includes("'")) {
+    const i = s.indexOf("'");
+    const fPart = s.slice(0, i).trim();
+    let iPart = s.slice(i + 1).replace(/"/g, '').replace(/^[\s-]+/, '').trim();
+    const f = parseNumFrac(fPart);
+    if (f == null) return null;
+    let inch = 0;
+    if (iPart) { const p = parseNumFrac(iPart); if (p == null) return null; inch = p; }
+    val = f + inch / 12;
+  } else if (s.endsWith('"')) {
+    const p = parseNumFrac(s.slice(0, -1).trim());
+    if (p == null) return null;
+    val = p / 12;
+  } else {
+    // "4-6" is feet-inches only when both parts are plain integers and the
+    // second is a believable inch count; otherwise it is not a length at all.
+    const m = s.match(/^(\d+)\s*-\s*(\d+(?:\s+\d+\/\d+)?)$/);
+    if (m && parseFloat(m[2]) < 12) {
+      const f = parseNumFrac(m[1]), inch = parseNumFrac(m[2]);
+      if (f == null || inch == null) return null;
+      val = f + inch / 12;
+    } else {
+      const p = parseNumFrac(s);
+      if (p == null) return null;
+      val = p;
+    }
+  }
+  if (val == null || !isFinite(val)) return null;
+  return neg ? -val : val;
+}
+
+// decimal feet -> display. mode 'frac' (default) or 'dec'
+function fmtLen(ft, mode) {
+  if (ft == null || isNaN(ft)) return '—';
+  mode = mode || State.units;
+  if (mode === 'dec') return ft.toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + "'";
+  const neg = ft < 0, abs = Math.abs(ft);
+  let inTot = Math.round(abs * 12 * 16) / 16;                 // to 1/16"
+  let feet = Math.floor(inTot / 12);
+  let inch = inTot - feet * 12;
+  let whole = Math.floor(inch + 1e-9);
+  let frac = inch - whole;
+  // reduce sixteenths
+  let n = Math.round(frac * 16), d = 16;
+  while (n && n % 2 === 0) { n /= 2; d /= 2; }
+  if (n === d) { n = 0; whole += 1; }
+  if (whole === 12) { whole = 0; feet += 1; }
+  const fracStr = n ? (VULGAR[n / d] || (n + '/' + d)) : '';
+  return (neg ? '-' : '') + feet + "'-" + whole + fracStr + '"';
+}
+// compact form used inside dense table cells: no feet part below 1'
+function fmtLenTight(ft, mode) {
+  if (ft == null || isNaN(ft)) return '—';
+  mode = mode || State.units;
+  if (mode === 'dec') return fmtLen(ft, 'dec');
+  if (Math.abs(ft) < 1) {
+    const inTot = Math.round(ft * 12 * 16) / 16;
+    let whole = Math.floor(Math.abs(inTot) + 1e-9), frac = Math.abs(inTot) - whole;
+    let n = Math.round(frac * 16), d = 16;
+    while (n && n % 2 === 0) { n /= 2; d /= 2; }
+    if (n === d) { n = 0; whole += 1; }
+    return (ft < 0 ? '-' : '') + whole + (n ? (VULGAR[n / d] || (n + '/' + d)) : '') + '"';
+  }
+  return fmtLen(ft, mode);
+}
+const fmtLf = (ft) => (Math.round(ft * 100) / 100).toFixed(ft % 1 ? 1 : 0) + ' lf';
+const fmtSf = (sf) => (Math.round(sf * 10) / 10) + ' sf';
+
+/* ==================================================================
+   STORE  —  two-tier, after SetDraft: localStorage is the crash
+   survivor, IndexedDB is the authority.  The whole DB is one record;
+   a few catalogues of a couple hundred rows is tens of kilobytes.
+   ================================================================== */
+
+const DB_NAME = 'tally', DB_VERSION = 1, STORE = 'db';
+const AUTOSAVE_KEY = 'tally.autosave.v1';
+
+const DEFAULT_WASTE = { linear: 10, sheet: 15, unit: 0 };
+
+let DB = {
+  v: 1,
+  vendors: [],
+  catalogs: [],
+  recipes: [],
+  jobs: [],
+  activeJobId: null,
+  units: 'frac',
+};
+
+const State = {
+  tab: 'job',
+  units: 'frac',
+  search: '',
+  catFilter: '',
+  selCatalogId: null,
+  selRecipeId: null,
+  dirty: false,
+};
+
+function openDB() {
+  return new Promise((res, rej) => {
+    let req;
+    try { req = indexedDB.open(DB_NAME, DB_VERSION); }
+    catch (e) { return rej(e); }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+    };
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function persist() {
+  const json = JSON.stringify(DB);
+  // Tier 1 — synchronous hot slot. Best effort; quota failures are not fatal.
+  try { localStorage.setItem(AUTOSAVE_KEY, json); } catch (_) {}
+  // Tier 2 — the real store.
+  try {
+    const db = await openDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(json, 'main');
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    db.close();
+    $('#stStore').textContent = 'saved ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    $('#stStore').textContent = 'localStorage only — ' + (e && e.name || 'no IndexedDB');
+  }
+}
+let _saveT = null;
+function save() {
+  State.dirty = true;
+  clearTimeout(_saveT);
+  _saveT = setTimeout(() => { State.dirty = false; persist(); }, 400);
+}
+
+async function load() {
+  let json = null;
+  try {
+    const db = await openDB();
+    json = await new Promise((res) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const r = tx.objectStore(STORE).get('main');
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => res(null);
+    });
+    db.close();
+  } catch (_) {}
+  if (!json) { try { json = localStorage.getItem(AUTOSAVE_KEY); } catch (_) {} }
+  if (!json) return false;
+  try {
+    const d = JSON.parse(json);
+    if (d && typeof d === 'object') { DB = Object.assign(DB, d); return true; }
+  } catch (_) {}
+  return false;
+}
+
+/* ---- accessors ---- */
+const vendorById  = (id) => DB.vendors.find(v => v.id === id) || null;
+const catalogById = (id) => DB.catalogs.find(c => c.id === id) || null;
+const jobById     = (id) => DB.jobs.find(j => j.id === id) || null;
+const recipeById  = (id) => DB.recipes.find(r => r.id === id) || null;
+
+function activeJob() {
+  let j = jobById(DB.activeJobId);
+  if (!j) { j = DB.jobs[0] || null; DB.activeJobId = j ? j.id : null; }
+  return j;
+}
+function activeCatalog() {
+  const j = activeJob();
+  if (j && j.catalogId) { const c = catalogById(j.catalogId); if (c) return c; }
+  return DB.catalogs[0] || null;
+}
+function itemById(cat, id) { return cat ? (cat.items.find(i => i.id === id) || null) : null; }
+
+function newJob(name) {
+  const cat = DB.catalogs[0] || null;
+  const j = {
+    id: uid(), name: name || 'Untitled job',
+    vendorId: cat ? cat.vendorId : null,
+    catalogId: cat ? cat.id : null,
+    created: new Date().toISOString(), modified: new Date().toISOString(),
+    globalWastePct: 10, lines: [], snapshots: [],
+  };
+  DB.jobs.unshift(j); DB.activeJobId = j.id;
+  return j;
+}
+function touchJob() {
+  const j = activeJob(); if (j) j.modified = new Date().toISOString();
+  save();
+}
+
+/* ==================================================================
+   PDF  —  extract a priced catalogue out of a supplier quote.
+   Walks stream/endstream, inflates, reads the text operators, decodes
+   <hex> as UTF-16BE, buckets by Y into rows and by X into cells.
+   Tuned against Mar-Lyn's layout; fails loudly so CSV can take over.
+   ================================================================== */
+
+async function inflateOnce(bytes, fmt) {
+  const ds = new DecompressionStream(fmt);
+  const ab = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+  return new Uint8Array(ab);
+}
+// A stream's body is usually followed by an EOL before `endstream`, and
+// DecompressionStream — unlike zlib — refuses trailing junk. Trim and retry.
+async function inflateBytes(bytes) {
+  if (typeof DecompressionStream === 'undefined') return null;
+  let end = bytes.length;
+  while (end > 0 && (bytes[end - 1] === 0x0a || bytes[end - 1] === 0x0d)) end--;
+  const tries = [bytes.subarray(0, end), bytes];
+  for (const body of tries) {
+    if (!body.length) continue;
+    for (const fmt of ['deflate', 'deflate-raw']) {
+      try {
+        const out = await inflateOnce(body, fmt);
+        if (out.length) return out;
+      } catch (_) {}
+    }
+  }
+  return null;
+}
+
+function bytesToLatin1(u8) {
+  let s = '', CH = 0x8000;
+  for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+  return s;
+}
+
+function decodePdfHex(hex) {
+  if (hex.length % 2) hex += '0';
+  const bytes = [];
+  for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.substr(i, 2), 16));
+  // UTF-16BE when the high byte of every pair is zero-ish
+  let looksWide = bytes.length % 2 === 0 && bytes.length > 1;
+  if (looksWide) for (let i = 0; i < bytes.length; i += 2) if (bytes[i] > 0x0f) { looksWide = false; break; }
+  let out = '';
+  if (looksWide) for (let i = 0; i < bytes.length; i += 2) out += String.fromCharCode((bytes[i] << 8) | bytes[i + 1]);
+  else for (const b of bytes) out += String.fromCharCode(b);
+  return out;
+}
+
+function decodePdfLiteral(s) {
+  return s.replace(/\\([nrtbf()\\]|[0-7]{1,3})/g, (m, g) => {
+    const simple = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', '(': '(', ')': ')', '\\': '\\' };
+    if (simple[g] !== undefined) return simple[g];
+    return String.fromCharCode(parseInt(g, 8));
+  });
+}
+
+// -> [{y, cells:[{x, t}]}]  in document order
+function pdfTextRows(streamText) {
+  const re = new RegExp(
+    '(-?[\\d.]+)\\s+(-?[\\d.]+)\\s+Td' +
+    '|(?:-?[\\d.]+\\s+){4}(-?[\\d.]+)\\s+(-?[\\d.]+)\\s+Tm' +
+    '|<([0-9A-Fa-f]+)>\\s*Tj' +
+    '|\\(((?:\\\\.|[^\\\\)])*)\\)\\s*Tj', 'g');
+  let x = 0, y = 0, m;
+  const items = [];
+  while ((m = re.exec(streamText)) !== null) {
+    if (m[1] !== undefined) { x += parseFloat(m[1]); y += parseFloat(m[2]); }
+    else if (m[3] !== undefined) { x = parseFloat(m[3]); y = parseFloat(m[4]); }
+    else {
+      const t = m[5] !== undefined ? decodePdfHex(m[5]) : decodePdfLiteral(m[6] || '');
+      if (t.trim()) items.push({ y: Math.round(y * 10) / 10, x: Math.round(x * 10) / 10, t: t.trim() });
+    }
+  }
+  const byY = new Map();
+  for (const it of items) {
+    if (!byY.has(it.y)) byY.set(it.y, []);
+    byY.get(it.y).push(it);
+  }
+  return Array.from(byY.entries())
+    .sort((a, b) => b[0] - a[0])
+    .map(([yy, cells]) => ({ y: yy, cells: cells.sort((a, b) => a.x - b.x) }));
+}
+
+const numOf = (s) => {
+  if (s == null) return null;
+  const t = String(s).replace(/[$,\s]/g, '');
+  if (!/^-?\d*\.?\d+$/.test(t)) return null;
+  return parseFloat(t);
+};
+
+async function parseVendorPDF(arrayBuffer) {
+  const u8 = new Uint8Array(arrayBuffer);
+  const raw = bytesToLatin1(u8);
+  const rows = [];
+  let idx = 0, pages = 0;
+  while (true) {
+    const s = raw.indexOf('stream', idx);
+    if (s < 0) break;
+    let p = s + 6;
+    if (raw[p] === '\r') p++;
+    if (raw[p] === '\n') p++;
+    const e = raw.indexOf('endstream', p);
+    if (e < 0) break;
+    idx = e + 9;
+    // Prefer the dictionary's /Length; fall back to everything up to endstream.
+    let end = e;
+    const dict = raw.slice(Math.max(0, s - 300), s);
+    const lm = /\/Length\s+(\d+)\s*(?:\/|>>|$)/.exec(dict);
+    if (lm) {
+      const n = +lm[1];
+      if (n > 0 && p + n <= e && e - (p + n) <= 4) end = p + n;
+    }
+    const inf = await inflateBytes(u8.subarray(p, end));
+    if (!inf) continue;
+    const txt = bytesToLatin1(inf);
+    if (txt.indexOf('Tj') < 0 && txt.indexOf('TJ') < 0) continue;
+    pages++;
+    for (const r of pdfTextRows(txt)) rows.push(r);
+  }
+  if (!pages) {
+    throw new Error('No readable text in this PDF — it is probably a scan. Use CSV / paste instead.');
+  }
+
+  const meta = { vendorName: '', address: [], label: '', sourceRef: '', pricedAt: '',
+    taxRates: {}, subtotal: null, tax: null, phone: '', email: '' };
+  const items = [];
+  const seenCodes = new Set();
+  let skipped = 0, rowCount = 0, gross = 0;
+  const dupes = [];
+
+  for (const row of rows) {
+    const c = row.cells.map(x => x.t);
+    const n = c.length;
+
+    // ---- metadata sweeps ----
+    if (n >= 2) {
+      const k = c[0].replace(/[:\s]+$/, '').toLowerCase();
+      if (k === 'quote no' || k === 'invoice no' || k === 'order no') meta.sourceRef = c[0].replace(/[:\s]*$/, '') + ' ' + c[1];
+      if (k === 'date' && !meta.pricedAt) meta.pricedAt = normDate(c[1]);
+      if (k === 'subtotal') meta.subtotal = numOf(c[1]);
+      if (/^hst$|^gst$|^tax$/.test(k)) meta.tax = numOf(c[1]);
+    }
+    for (const t of c) {
+      let m = t.match(/^([A-Z])\s*-\s*(?:HST|GST|PST|TAX)\s*([\d.]+)\s*%$/i);
+      if (m) meta.taxRates[m[1].toUpperCase()] = parseFloat(m[2]) / 100;
+      m = t.match(/e-?mail:\s*([^\s,]+@[^\s,]+)/i);
+      if (m) meta.email = m[1];
+      m = t.match(/telephone:\s*([()\d\s.-]{7,})/i);
+      if (m) meta.phone = m[1].trim().replace(/,$/, '');
+      if (/LIMITED|LTD|INC\.?$|LUMBER|SUPPLY/i.test(t) && t.length > 8 && !meta.vendorName && n === 1) meta.vendorName = t;
+      if (/^(REGULAR|CONTRACT|LIFT|TRADE|NET)\b.*PRICING$/i.test(t)) meta.label = t;
+    }
+
+    // ---- line items ----
+    // code | qty | unit | …description… | taxCode | unitPrice | amount
+    if (n < 7) { if (n > 2) skipped++; continue; }
+    const code = c[0], qty = numOf(c[1]), unit = c[2];
+    const tax = c[n - 3], price = numOf(c[n - 2]), amount = numOf(c[n - 1]);
+    const desc = c.slice(3, n - 3).join(' ').trim();
+    const ok = qty !== null && price !== null && amount !== null &&
+      /^[A-Z]$/.test(tax) && /^[A-Za-z0-9][\w./#&+-]*$/.test(code) &&
+      unit.length <= 8 && desc.length > 0;
+    if (!ok) { skipped++; continue; }
+    rowCount++; gross += price;
+    // A quote may print the same SKU on more than one page; a catalogue holds it once.
+    if (seenCodes.has(code)) { dupes.push(code); continue; }
+    seenCodes.add(code);
+    items.push({ code, unit: unit.replace(/\.$/, ''), description: desc, taxCode: tax, price });
+  }
+
+  if (!items.length) throw new Error('Found text but no priced rows in the expected column order. Use CSV / paste instead.');
+  meta.grossSum = Math.round(gross * 100) / 100;
+  return { meta, items, skipped, pages, rowCount, dupes, gross: meta.grossSum };
+}
+
+function normDate(s) {
+  const m = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return m[3] + '-' + m[1].padStart(2, '0') + '-' + m[2].padStart(2, '0');
+  const m2 = String(s).match(/^\d{4}-\d{2}-\d{2}$/);
+  return m2 ? String(s) : '';
+}
+
+/* ---- CSV / paste ---- */
+function parseDelimited(text) {
+  const t = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+  if (!t.trim()) return [];
+  const tabs = (t.match(/\t/g) || []).length, commas = (t.match(/,/g) || []).length;
+  const delim = tabs >= commas ? '\t' : ',';
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) {
+      if (ch === '"') { if (t[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(cell); cell = ''; }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  row.push(cell); rows.push(row);
+  return rows.map(r => r.map(c => c.trim()));
+}
+
+/* ==================================================================
+   INFER  —  guess what a catalogue row physically IS, from its
+   description.  Nothing downstream works without this, and it is only
+   ever a guess, so the import always shows it back for confirmation.
+   ================================================================== */
+
+const UNIT_SHEET  = ['sht', 'sheet', 'shts', 'each', 'ea', 'pnl'];
+const UNIT_LINEAR = ['ft', 'lf', 'lin', 'lnft'];
+const UNIT_PIECE  = ['pc', 'pcs', 'piece', 'stick'];
+
+const normUnit = (u) => String(u || '').toLowerCase().replace(/[.\s]/g, '');
+const normSpecies = (s) => String(s || '').toLowerCase()
+  .replace(/["']/g, '').replace(/[#,.]/g, ' ')
+  .replace(/\s+/g, ' ').trim();
+
+function fmtThick(t) { return t ? t.replace(/"/g, '') : ''; }
+
+function thickToIn(str) {
+  if (!str) return null;
+  const mm = str.match(/^([\d.]+)\s*mm$/i);
+  if (mm) return parseFloat(mm[1]) / 25.4;
+  return parseNumFrac(str.replace(/"/g, ''));
+}
+
+function findSize(d) {
+  let m = d.match(/(?:^|[^\d\/.])(\d{1,2})\s*[xX×]\s*(\d{1,2})\s*[xX×]\s*(\d{1,3})(?![\d\/])/);
+  if (m) return { a: +m[1], b: +m[2], c: +m[3], text: m[0].replace(/^[^\d]/, '') };
+  m = d.match(/(?:^|[^\d\/.])(\d{1,2})\s*[xX×]\s*(\d{1,2})(?![\d\/xX×])/);
+  if (m) return { a: +m[1], b: +m[2], c: null, text: m[0].replace(/^[^\d]/, '') };
+  return null;
+}
+
+function findThick(d) {
+  let m = d.match(/(?:^|[\s(,])((?:\d+\s+)?\d+\s*\/\s*\d+)(?=[\s"x×]|$)/);
+  if (m) return m[1].replace(/\s*\/\s*/, '/');
+  m = d.match(/(?:^|[\s(,])([\d.]+\s*mm)\b/i);
+  if (m) return m[1].replace(/\s+/g, '').toLowerCase();
+  m = d.match(/(?:^|[\s(,])([\d.]+\s*")/);
+  if (m) return m[1].replace(/\s+/g, '');
+  m = d.match(/^([\d.]+)\s+(?=\d+\s*[xX×])/);           // "1 4x8 Codeboard"
+  if (m) return m[1];
+  return null;
+}
+
+// -> { kind:'linear'|'sheet', ... } | null   plus flags on the item
+function inferStock(description, unit, code) {
+  const d0 = String(description || '').replace(/''/g, '"').replace(/×/g, 'x');
+  const u = normUnit(unit);
+  const isSheetUnit  = UNIT_SHEET.includes(u);
+  const isLinearUnit = UNIT_LINEAR.includes(u) || UNIT_PIECE.includes(u);
+
+  const size = findSize(d0);
+  let rest = size ? d0.replace(size.text, ' ') : d0;
+  const thick = findThick(size ? d0.replace(size.text, ' ') : d0);
+  if (thick) rest = rest.replace(thick, ' ');
+  const species = rest.replace(/[x×]/g, ' ').replace(/[-–]/g, ' ')
+    .replace(/\s+/g, ' ').replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '').trim();
+
+  if (isSheetUnit) {
+    const w = size ? Math.min(size.a, size.b) : 4;
+    const h = size ? Math.max(size.a, size.b) : 8;
+    return { kind: 'sheet', w, h, thick: thick || null, thickIn: thickToIn(thick),
+      species: species || d0, assumedSize: !size };
+  }
+
+  if (isLinearUnit) {
+    if (size && size.c != null) {
+      return { kind: 'linear', nominal: size.a + 'x' + size.b, len: size.c,
+        species: species || d0, assumedSize: false };
+    }
+    if (size) {
+      return { kind: 'linear', nominal: size.a + 'x' + size.b, len: null,
+        species: species || d0, assumedSize: false };
+    }
+    const fp = d0.match(/(?:^|[^\d])(\d+\s*\/\s*\d+)\s*[xX×]\s*(\d{1,2})/);
+    if (fp) {
+      const nom = fp[1].replace(/\s+/g, '') + 'x' + fp[2];
+      const sp = d0.replace(fp[0], ' ').replace(/["']/g, '').replace(/\s+/g, ' ').trim();
+      return { kind: 'linear', nominal: nom, len: null, species: sp || d0, assumedSize: false };
+    }
+    const xl = d0.match(/[xX×]\s*(\d{1,2})\s*'/);        // "Cantstrip x 8'"
+    if (xl) {
+      const sp = d0.replace(xl[0], ' ').replace(/\s+/g, ' ').trim();
+      return { kind: 'linear', nominal: null, len: +xl[1], species: sp || d0, assumedSize: false };
+    }
+    // Sold by the piece with no dimensions anywhere is an object, not stock.
+    if (UNIT_PIECE.includes(u)) return null;
+    return { kind: 'linear', nominal: null, len: null, species: d0, assumedSize: false };
+  }
+
+  return null;      // consumable: glue, screws by the thousand, canvas by the yard
+}
+
+function stockNeedsReview(st) {
+  if (!st) return false;
+  if (st.kind === 'linear') return !st.len;
+  if (st.kind === 'sheet') return !!st.assumedSize;
+  return false;
+}
+
+function stockLabel(st) {
+  if (!st) return '—';
+  if (st.kind === 'linear')
+    return (st.nominal || '?') + (st.len ? '×' + st.len + "'" : ' ×?');
+  return (st.thick ? fmtThick(st.thick) + ' ' : '') + st.w + '×' + st.h + ' sheet';
+}
+
+/* ---- classes: the grouping the nester and recipes bind to ---- */
+function classKeyOf(item) {
+  if (item.classOverride) return 'U|' + normSpecies(item.classOverride);
+  const st = item.stock;
+  if (!st) return null;
+  if (st.kind === 'linear') return 'L|' + (st.nominal || '?') + '|' + normSpecies(st.species);
+  return 'S|' + normSpecies(st.species) + '|' + (st.thick || '');
+}
+function classLabelOf(item) {
+  if (item.classOverride) return item.classOverride;
+  const st = item.stock;
+  if (!st) return '';
+  if (st.kind === 'linear') return ((st.nominal ? st.nominal + ' ' : '') + st.species).trim();
+  return ((st.thick ? fmtThick(st.thick) + ' ' : '') + st.species).trim();
+}
+
+// -> Map key -> { key, kind, label, items:[item], lengths:[..], sizes:[..] }
+function buildClasses(cat) {
+  const map = new Map();
+  if (!cat) return map;
+  for (const it of cat.items) {
+    const key = classKeyOf(it);
+    if (!key) continue;
+    if (!map.has(key)) {
+      map.set(key, { key, kind: it.stock ? it.stock.kind : 'unit',
+        label: classLabelOf(it) || it.description, items: [] });
+    }
+    map.get(key).items.push(it);
+  }
+  for (const cl of map.values()) {
+    cl.lengths = cl.items.filter(i => i.stock && i.stock.len).map(i => i.stock.len).sort((a, b) => a - b);
+    cl.sizes = cl.items.filter(i => i.stock && i.stock.kind === 'sheet')
+      .map(i => i.stock.w + 'x' + i.stock.h);
+    cl.items.sort((a, b) => (a.stock && a.stock.len || 0) - (b.stock && b.stock.len || 0));
+  }
+  return map;
+}
+function classesOf(cat) {
+  if (!cat) return new Map();
+  if (cat._cls && cat._clsStamp === cat.items.length + '|' + (cat._rev || 0)) return cat._cls;
+  cat._cls = buildClasses(cat);
+  cat._clsStamp = cat.items.length + '|' + (cat._rev || 0);
+  return cat._cls;
+}
+function bumpCatalog(cat) { if (cat) { cat._rev = (cat._rev || 0) + 1; cat._cls = null; } }
+
+/* ==================================================================
+   NEST  —  1D first-fit-decreasing over real stock lengths.  Offcuts
+   are the partially filled bins, so reuse is native; the flag exists
+   to prove it is doing something.
+   ================================================================== */
+
+const KERF = 0.125 / 12;      // 1/8" saw kerf, in feet
+const EPS = 1e-6;
+
+function nest1D(pieces, lengths, opts) {
+  opts = opts || {};
+  const reuse = opts.reuse !== false;
+  const stock = lengths.slice().sort((a, b) => a.len - b.len);
+  const flat = [];
+  for (const p of pieces) for (let i = 0; i < p.qty; i++) flat.push({ len: p.len, label: p.label });
+  flat.sort((a, b) => b.len - a.len);
+
+  const bins = [], tooLong = [];
+  const maxLen = stock.length ? stock[stock.length - 1].len : 0;
+
+  const fillScore = (L, from) => {           // greedy leftover if we open an L now
+    let rem = L, used = 0;
+    for (let i = from; i < flat.length; i++) {
+      const need = flat[i].len + (used > 0 ? KERF : 0);
+      if (need <= rem + EPS) { rem -= need; used++; }
+    }
+    return rem / L;
+  };
+
+  for (let i = 0; i < flat.length; i++) {
+    const piece = flat[i];
+    if (piece.len > maxLen + EPS) { tooLong.push(piece); continue; }
+    let placed = false;
+    if (reuse) {
+      for (const b of bins) {
+        const need = piece.len + (b.cuts.length ? KERF : 0);
+        if (need <= b.rem + EPS) { b.rem -= need; b.cuts.push(piece.len); placed = true; break; }
+      }
+    }
+    if (placed) continue;
+    let best = null;
+    for (const s of stock) {
+      if (s.len + EPS < piece.len) continue;
+      const score = fillScore(s.len, i);
+      const cand = { s, score, cpf: s.cost / s.len };
+      if (!best || cand.score < best.score - 1e-9 ||
+         (Math.abs(cand.score - best.score) < 1e-9 && cand.cpf < best.cpf)) best = cand;
+    }
+    if (!best) { tooLong.push(piece); continue; }
+    bins.push({ len: best.s.len, itemId: best.s.itemId, cost: best.s.cost,
+      rem: best.s.len - piece.len, cuts: [piece.len] });
+  }
+
+  const usedLf = flat.reduce((a, p) => a + p.len, 0) - tooLong.reduce((a, p) => a + p.len, 0);
+  const boughtLf = bins.reduce((a, b) => a + b.len, 0);
+  return { bins, sticks: bins.length, usedLf, boughtLf,
+    yield: boughtLf ? usedLf / boughtLf : 0, tooLong };
+}
+
+function panelsPerSheet(pw, ph, sw, sh) {
+  const a = Math.floor(sw / pw + EPS) * Math.floor(sh / ph + EPS);
+  const b = Math.floor(sw / ph + EPS) * Math.floor(sh / pw + EPS);
+  return Math.max(a, b);
+}
+
+/* ==================================================================
+   MATH  —  lines -> demand groups -> buy list -> money.
+   Order: raw need, waste, whole units, price, tax.
+   ================================================================== */
+
+function unitIsPerFoot(item) { return UNIT_LINEAR.includes(normUnit(item.unit)); }
+function stickCost(item) {
+  if (!item.stock || item.stock.kind !== 'linear') return item.price;
+  return unitIsPerFoot(item) ? item.price * (item.stock.len || 1) : item.price;
+}
+
+function resolveWaste(job, item, override) {
+  if (override != null && override !== '') return { pct: +override, origin: 'line' };
+  if (item && item.wastePct != null) return { pct: +item.wastePct, origin: 'material' };
+  return { pct: +(job.globalWastePct || 0), origin: 'job' };
+}
+function defaultWasteFor(stock) {
+  if (!stock) return DEFAULT_WASTE.unit;
+  return stock.kind === 'sheet' ? DEFAULT_WASTE.sheet : DEFAULT_WASTE.linear;
+}
+
+function computeJob(job) {
+  const cat = job ? catalogById(job.catalogId) : null;
+  const out = { groups: [], subtotal: 0, taxes: {}, taxTotal: 0, total: 0,
+    flags: [], catalog: cat, lineCount: 0, runs: {} };
+  if (!job || !cat) return out;
+  const classes = classesOf(cat);
+  const groups = new Map();
+
+  const groupFor = (key, kind, label, cls, item) => {
+    if (!groups.has(key)) groups.set(key, { key, kind, label, cls, item,
+      pieces: [], panels: [], bulk: 0, bulkUnit: '', wastePct: null, wasteOrigin: 'job',
+      sources: [], flags: [] });
+    return groups.get(key);
+  };
+
+  for (const line of job.lines) {
+    out.lineCount++;
+    if (line.runId) out.runs[line.runId] = (out.runs[line.runId] || 0) + 1;
+    let cls = null, item = null, key = null, kind = 'unit', label = '';
+    if (line.target.type === 'class') {
+      cls = classes.get(line.target.key);
+      if (!cls) { out.flags.push('Line "' + (line.label || '?') + '" points at a material that is not in this catalogue.'); continue; }
+      key = 'C:' + cls.key; kind = cls.kind; label = cls.label;
+      item = cls.items[0];
+    } else {
+      item = itemById(cat, line.target.itemId);
+      if (!item) { out.flags.push('Line "' + (line.label || '?') + '" points at an item that is not in this catalogue.'); continue; }
+      key = 'I:' + item.id;
+      kind = (line.demand && line.demand.mode === 'bulk' && line.demand.unit === 'unit')
+        ? 'unit' : (item.stock ? item.stock.kind : 'unit');
+      label = item.description;
+    }
+    const g = groupFor(key, kind, label, cls, item);
+    const w = resolveWaste(job, item, line.wastePctOverride);
+    if (g.wastePct == null || w.pct > g.wastePct) { g.wastePct = w.pct; g.wasteOrigin = w.origin; }
+    g.sources.push(line);
+
+    const d = line.demand;
+    if (d.mode === 'pieces') for (const p of d.pieces) g.pieces.push(p);
+    else if (d.mode === 'panels') for (const p of d.panels) g.panels.push(p);
+    else { g.bulk += (+d.qty || 0); g.bulkUnit = d.unit || ''; }
+  }
+
+  for (const g of groups.values()) {
+    const wf = 1 + (g.wastePct || 0) / 100;
+    g.buys = [];      // [{item, count, each, amount}]
+    g.amount = 0;
+
+    if (g.kind === 'linear') {
+      const pool = (g.cls ? g.cls.items : [g.item]).filter(i => i.stock && i.stock.len);
+      if (!pool.length) {
+        g.flags.push('No stock length known for this material — set one in the Catalog.');
+        g.need = g.pieces.reduce((a, p) => a + p.len * p.qty, 0) + g.bulk;
+        g.needLabel = fmtLf(g.need); g.buyLabel = '—';
+      } else {
+        const lengths = pool.map(i => ({ len: i.stock.len, cost: stickCost(i), itemId: i.id }));
+        const nested = g.pieces.length ? nest1D(g.pieces, lengths, { reuse: job.reuseOffcuts !== false })
+          : { bins: [], sticks: 0, usedLf: 0, boughtLf: 0, yield: 0, tooLong: [] };
+        g.nest = nested;
+        if (nested.tooLong.length)
+          g.flags.push(nested.tooLong.length + ' piece(s) longer than the longest stock (' +
+            Math.max.apply(null, lengths.map(l => l.len)) + "') — they need a splice.");
+
+        const counts = new Map();
+        for (const b of nested.bins) counts.set(b.itemId, (counts.get(b.itemId) || 0) + 1);
+        // waste uplift on the nested stick count
+        let nestedSticks = nested.sticks;
+        let withWaste = Math.ceil(nestedSticks * wf - EPS);
+        let extra = withWaste - nestedSticks;
+        // bulk lineal feet buy their own sticks off the cheapest per-foot length
+        const cheapest = lengths.slice().sort((a, b) => (a.cost / a.len) - (b.cost / b.len))[0];
+        const longest = lengths.slice().sort((a, b) => b.len - a.len)[0];
+        if (g.bulk > 0) extra += Math.ceil((g.bulk * wf) / longest.len - EPS);
+        if (extra > 0) counts.set(longest.itemId, (counts.get(longest.itemId) || 0) + extra);
+
+        for (const [itemId, count] of counts) {
+          const it = itemById(cat, itemId);
+          const each = stickCost(it);
+          g.buys.push({ item: it, count, each, amount: count * each });
+        }
+        g.need = g.pieces.reduce((a, p) => a + p.len * p.qty, 0) + g.bulk;
+        g.needLabel = fmtLf(g.need);
+        g.sticks = g.buys.reduce((a, b) => a + b.count, 0);
+        g.buyLabel = g.buys.length === 1
+          ? g.sticks + ' × ' + g.buys[0].item.stock.len + "'"
+          : g.buys.map(b => b.count + '×' + b.item.stock.len + "'").join(' + ');
+        g.yield = nested.boughtLf ? nested.usedLf / (g.sticks * (g.buys[0] ? g.buys[0].item.stock.len : 1)) : null;
+        if (g.sticks) {
+          const boughtLf = g.buys.reduce((a, b) => a + b.count * b.item.stock.len, 0);
+          g.yield = boughtLf ? g.need / boughtLf : null;
+          g.offcutLf = boughtLf - g.need;
+          g.longOffcuts = nested.bins.filter(b => b.rem >= 2).map(b => b.rem).sort((a, b) => b - a);
+        }
+      }
+    } else if (g.kind === 'sheet') {
+      const pool = (g.cls ? g.cls.items : [g.item]).filter(i => i.stock && i.stock.kind === 'sheet');
+      const counts = new Map();
+      let needSf = 0;
+      for (const p of g.panels) {
+        needSf += p.w * p.h * p.qty;
+        let best = null;
+        for (const it of pool) {
+          const pps = panelsPerSheet(p.w, p.h, it.stock.w, it.stock.h);
+          if (!pps) continue;
+          const cand = { it, pps, waste: (it.stock.w * it.stock.h) / pps - p.w * p.h, cost: it.price / pps };
+          if (!best || cand.cost < best.cost - 1e-9) best = cand;
+        }
+        if (!best) {
+          g.flags.push('A ' + fmtLenTight(p.w) + ' × ' + fmtLenTight(p.h) +
+            ' panel does not fit any sheet in this class — it needs a seam, or a bigger sheet.');
+          continue;
+        }
+        const sheets = Math.ceil((p.qty * wf) / best.pps - EPS);
+        counts.set(best.it.id, (counts.get(best.it.id) || 0) + sheets);
+      }
+      if (g.bulk > 0) {
+        const it = pool.slice().sort((a, b) =>
+          (a.price / (a.stock.w * a.stock.h)) - (b.price / (b.stock.w * b.stock.h)))[0];
+        if (it) {
+          needSf += g.bulk;
+          counts.set(it.id, (counts.get(it.id) || 0) +
+            Math.ceil((g.bulk * wf) / (it.stock.w * it.stock.h) - EPS));
+        }
+      }
+      for (const [itemId, count] of counts) {
+        const it = itemById(cat, itemId);
+        g.buys.push({ item: it, count, each: it.price, amount: count * it.price });
+      }
+      g.need = needSf;
+      g.needLabel = fmtSf(needSf);
+      g.sheets = g.buys.reduce((a, b) => a + b.count, 0);
+      g.buyLabel = g.sheets ? g.sheets + ' sht' : '—';
+      const boughtSf = g.buys.reduce((a, b) => a + b.count * b.item.stock.w * b.item.stock.h, 0);
+      g.yield = boughtSf ? needSf / boughtSf : null;
+      g.offcutSf = boughtSf - needSf;
+      g.areaOnly = true;
+    } else {
+      const it = g.item;
+      const need = g.bulk;
+      const buy = Math.ceil(need * wf - EPS);
+      g.need = need;
+      g.needLabel = (Math.round(need * 100) / 100) + ' ' + (it ? it.unit : '');
+      g.buyLabel = buy + ' ' + (it ? it.unit : '');
+      if (it && buy > 0) g.buys.push({ item: it, count: buy, each: it.price, amount: buy * it.price });
+    }
+
+    g.amount = g.buys.reduce((a, b) => a + b.amount, 0);
+    g.code = g.buys.length ? g.buys[0].item.code : (g.item ? g.item.code : '—');
+    g.unit = g.buys.length ? g.buys[0].item.unit : (g.item ? g.item.unit : '');
+    g.price = g.buys.length ? g.buys[0].item.price : (g.item ? g.item.price : null);
+    out.subtotal += g.amount;
+    const taxCode = (g.buys[0] || {}).item ? g.buys[0].item.taxCode : (g.item ? g.item.taxCode : null);
+    if (taxCode) {
+      const rate = (cat.taxRates && cat.taxRates[taxCode]) || 0;
+      out.taxes[taxCode] = (out.taxes[taxCode] || 0) + g.amount * rate;
+    }
+    out.groups.push(g);
+  }
+
+  out.groups.sort((a, b) => b.amount - a.amount);
+  out.taxTotal = Object.values(out.taxes).reduce((a, b) => a + b, 0);
+  out.total = out.subtotal + out.taxTotal;
+  return out;
+}
+
+/* ==================================================================
+   RECIPES  —  parts are data, not code.  A tiny recursive-descent
+   evaluator; no eval(), no Function(), because recipes get exported,
+   imported and hand-edited.
+   Convention: bare numbers are feet; `in` / `"` suffixes convert.
+   ================================================================== */
+
+const FUNCS = {
+  min: Math.min, max: Math.max, ceil: Math.ceil, floor: Math.floor,
+  round: Math.round, abs: Math.abs, sqrt: Math.sqrt,
+};
+
+function tokenize(src) {
+  const t = [];
+  let i = 0, s = String(src);
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if ('+-*/(),'.includes(c)) { t.push({ k: c }); i++; continue; }
+    let m = /^(\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)\s*(in|ft|"|')?/.exec(s.slice(i));
+    if (m && /\d/.test(m[1])) {
+      let v = parseNumFrac(m[1]);
+      if (v == null) throw new Error('bad number: ' + m[1]);
+      const u = m[2];
+      if (u === 'in' || u === '"') v /= 12;
+      t.push({ k: 'n', v }); i += m[0].length; continue;
+    }
+    m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(s.slice(i));
+    if (m) { t.push({ k: 'id', v: m[0] }); i += m[0].length; continue; }
+    throw new Error('unexpected "' + c + '"');
+  }
+  return t;
+}
+
+function evalExpr(src, scope) {
+  if (src === '' || src == null) return 0;
+  if (typeof src === 'number') return src;
+  const t = tokenize(src);
+  let p = 0;
+  const peek = () => t[p], eat = (k) => { if (!t[p] || t[p].k !== k) throw new Error('expected ' + k); return t[p++]; };
+
+  function expr() {
+    let v = term();
+    while (peek() && (peek().k === '+' || peek().k === '-')) {
+      const op = t[p++].k, r = term();
+      v = op === '+' ? v + r : v - r;
+    }
+    return v;
+  }
+  function term() {
+    let v = unary();
+    while (peek() && (peek().k === '*' || peek().k === '/')) {
+      const op = t[p++].k, r = unary();
+      if (op === '/' && r === 0) throw new Error('divide by zero');
+      v = op === '*' ? v * r : v / r;
+    }
+    return v;
+  }
+  function unary() {
+    if (peek() && peek().k === '-') { p++; return -unary(); }
+    if (peek() && peek().k === '+') { p++; return unary(); }
+    return primary();
+  }
+  function primary() {
+    const tk = peek();
+    if (!tk) throw new Error('unexpected end');
+    if (tk.k === 'n') { p++; return tk.v; }
+    if (tk.k === '(') { p++; const v = expr(); eat(')'); return v; }
+    if (tk.k === 'id') {
+      p++;
+      if (peek() && peek().k === '(') {
+        p++;
+        const args = [];
+        if (peek() && peek().k !== ')') {
+          args.push(expr());
+          while (peek() && peek().k === ',') { p++; args.push(expr()); }
+        }
+        eat(')');
+        const f = FUNCS[tk.v];
+        if (!f) throw new Error('unknown function ' + tk.v + '()');
+        return f.apply(null, args);
+      }
+      if (scope && Object.prototype.hasOwnProperty.call(scope, tk.v)) return scope[tk.v];
+      throw new Error('unknown name "' + tk.v + '"');
+    }
+    throw new Error('unexpected token');
+  }
+  const v = expr();
+  if (p !== t.length) throw new Error('trailing input');
+  if (!isFinite(v)) throw new Error('not a finite number');
+  return v;
+}
+
+/* ---- the built-in library ---- */
+function builtinRecipes() {
+  return [
+  { id: 'rc-hollywood', name: 'Hollywood Flat', builtin: true,
+    note: 'On-edge frame with rails, stiles and toggles, skinned one side.',
+    params: [
+      { key: 'W', label: 'Width',  type: 'length', default: 4 },
+      { key: 'H', label: 'Height', type: 'length', default: 8 },
+      { key: 'toggle_spc', label: 'Toggle spacing', type: 'length', default: 2 },
+    ],
+    binds: [
+      { key: 'frame',  label: 'Frame stock', kind: 'linear', hint: '1x3' },
+      { key: 'skin',   label: 'Skin',        kind: 'sheet',  hint: 'lauan' },
+      { key: 'screws', label: 'Screws',      kind: 'unit',   hint: 'screws' },
+    ],
+    parts: [
+      { label: 'Rail (top/bottom)', bind: 'frame', kind: 'linear', qty: '2', length: 'W' },
+      { label: 'Stile (vert)',      bind: 'frame', kind: 'linear', qty: 'max(2, ceil(W/2)+1)', length: 'H - 1.5in' },
+      { label: 'Toggle (horiz)',    bind: 'frame', kind: 'linear', qty: 'max(0, ceil(H/toggle_spc) - 1)', length: 'W - 1.5in' },
+      { label: 'Skin panel',        bind: 'skin',  kind: 'sheet',  qty: '1', w: 'W', h: 'H' },
+      { label: 'Screws',            bind: 'screws', kind: 'unit',  qty: '(2 + max(2, ceil(W/2)+1) + max(0, ceil(H/toggle_spc) - 1)) * 6 / 1000' },
+    ] },
+  { id: 'rc-studwall', name: 'Stud Wall', builtin: true,
+    note: 'Framed wall: sole plate, doubled top plate, studs at spacing, sheathed one side.',
+    params: [
+      { key: 'L', label: 'Length',  type: 'length', default: 8 },
+      { key: 'H', label: 'Height',  type: 'length', default: 8 },
+      { key: 'spacing', label: 'Stud spacing', type: 'length', default: 1.3333333 },
+    ],
+    binds: [
+      { key: 'plate', label: 'Plate stock', kind: 'linear', hint: '2x4' },
+      { key: 'stud',  label: 'Stud stock',  kind: 'linear', hint: '2x4' },
+      { key: 'skin',  label: 'Sheathing',   kind: 'sheet',  hint: 'spruce' },
+    ],
+    parts: [
+      { label: 'Sole plate', bind: 'plate', kind: 'linear', qty: '1', length: 'L' },
+      { label: 'Top plate',  bind: 'plate', kind: 'linear', qty: '2', length: 'L' },
+      { label: 'Stud',       bind: 'stud',  kind: 'linear', qty: 'ceil(L/spacing) + 1', length: 'H - 4.5in' },
+      { label: 'Sheathing',  bind: 'skin',  kind: 'sheet',  qty: '1', w: 'L', h: 'H' },
+    ] },
+  { id: 'rc-platform', name: 'Platform', builtin: true,
+    note: 'Deck framed on edge with joists at 16", ply top, four legs.',
+    params: [
+      { key: 'W', label: 'Width',  type: 'length', default: 4 },
+      { key: 'L', label: 'Length', type: 'length', default: 8 },
+      { key: 'H', label: 'Height', type: 'length', default: 1 },
+    ],
+    binds: [
+      { key: 'frame', label: 'Frame stock', kind: 'linear', hint: '2x4' },
+      { key: 'top',   label: 'Deck',        kind: 'sheet',  hint: 'ply' },
+    ],
+    parts: [
+      { label: 'Rim (long)',  bind: 'frame', kind: 'linear', qty: '2', length: 'L' },
+      { label: 'Rim (short)', bind: 'frame', kind: 'linear', qty: '2', length: 'W - 3in' },
+      { label: 'Joist',       bind: 'frame', kind: 'linear', qty: 'max(0, ceil(L/1.3333) - 1)', length: 'W - 3in' },
+      { label: 'Leg',         bind: 'frame', kind: 'linear', qty: '4', length: 'H' },
+      { label: 'Deck',        bind: 'top',   kind: 'sheet',  qty: '1', w: 'W', h: 'L' },
+    ] },
+  ];
+}
+
+/* ---- running a recipe into job lines ---- */
+function expandRecipe(recipe, values, binds, count) {
+  const scope = {};
+  for (const p of recipe.params) scope[p.key] = values[p.key];
+  scope.qty = count;
+  const lines = [], runId = uid(), problems = [];
+  const desc = recipe.params.map(p => p.label + ' ' +
+    (p.type === 'length' ? fmtLenTight(values[p.key]) : values[p.key])).join(' · ');
+
+  for (const part of recipe.parts) {
+    const target = binds[part.bind];
+    if (!target) { problems.push('No material bound for "' + part.label + '".'); continue; }
+    let q, len, w, h;
+    try {
+      q = evalExpr(part.qty, scope) * count;
+      if (part.kind === 'linear') len = evalExpr(part.length, scope);
+      if (part.kind === 'sheet') { w = evalExpr(part.w, scope); h = evalExpr(part.h, scope); }
+    } catch (e) { problems.push(part.label + ': ' + e.message); continue; }
+    if (q <= 0) continue;
+    const base = { id: uid(), source: 'recipe', runId, recipeId: recipe.id,
+      label: recipe.name + ' — ' + part.label, runLabel: recipe.name + ' ×' + count,
+      runDesc: desc, target, wastePctOverride: null };
+    if (part.kind === 'linear') {
+      if (!(len > 0)) { problems.push(part.label + ': length came out ' + len); continue; }
+      lines.push(Object.assign(base, { demand: { mode: 'pieces',
+        pieces: [{ len, qty: Math.round(q), label: part.label }] } }));
+    } else if (part.kind === 'sheet') {
+      lines.push(Object.assign(base, { demand: { mode: 'panels',
+        panels: [{ w, h, qty: Math.round(q), label: part.label }] } }));
+    } else {
+      lines.push(Object.assign(base, { demand: { mode: 'bulk', qty: q, unit: 'unit' } }));
+    }
+  }
+  return { lines, runId, problems, desc };
+}
+
+/* ==================================================================
+   UI
+   ================================================================== */
+
+let CALC = null;
+
+function render() {
+  const j = activeJob();
+  $('#jobName').value = j ? j.name : '';
+  $('#globalWaste').value = j ? j.globalWastePct : 10;
+  $('#uFrac').classList.toggle('on', State.units === 'frac');
+  $('#uDec').classList.toggle('on', State.units === 'dec');
+  const cat = activeCatalog();
+  const ven = cat ? vendorById(cat.vendorId) : null;
+  $('#srcline').textContent = cat
+    ? [ven ? ven.name : 'vendor?', cat.label || 'price list', cat.pricedAt || '', cat.items.length + ' items']
+        .filter(Boolean).join(' · ')
+    : 'no catalog — import a price list';
+  $('#bCat').textContent = DB.catalogs.length ? '' + DB.catalogs.reduce((a, c) => a + c.items.length, 0) : '';
+  $('#bRec').textContent = DB.recipes.length ? '' + DB.recipes.length : '';
+  $('#bVen').textContent = DB.vendors.length ? '' + DB.vendors.length : '';
+  $$('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === State.tab));
+
+  CALC = j ? computeJob(j) : null;
+  const pane = $('#pane');
+  pane.innerHTML =
+    State.tab === 'job'     ? viewJob() :
+    State.tab === 'catalog' ? viewCatalog() :
+    State.tab === 'recipes' ? viewRecipes() :
+    State.tab === 'cutlist' ? viewCutList() :
+                              viewVendors();
+  $('#rail').innerHTML = viewRail();
+  wirePane();
+}
+
+/* ---------- JOB ---------- */
+function viewJob() {
+  const j = activeJob();
+  if (!j) return '<div class="empty"><b>No job yet</b>Press <kbd>N</kbd> or use <b>jobs</b> above to start one.</div>';
+  if (!CALC.catalog) return '<div class="empty"><b>No price list loaded</b>' +
+    'Tally ships empty on purpose — bring in your own supplier pricing.<br>' +
+    '<button class="btn pri" data-act="import" style="margin-top:12px">Import a price list</button></div>';
+  const gs = CALC.groups;
+  let h = '<div class="shead"><h2>Materials</h2><span class="n">' + gs.length + ' rolled up from ' +
+    CALC.lineCount + ' entr' + (CALC.lineCount === 1 ? 'y' : 'ies') + '</span>' +
+    '<div class="spring"></div>' +
+    '<button class="btn" data-act="add">+ material <kbd>/</kbd></button>' +
+    '<button class="btn" data-act="run">run recipe <kbd>R</kbd></button></div>';
+
+  if (!gs.length) {
+    h += '<div class="empty"><b>Empty job</b>Add a material with <kbd>/</kbd>, or explode a unit with <kbd>R</kbd>.</div>';
+  } else {
+    h += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+      '<th style="width:92px">Code</th><th style="width:34px">U</th><th>Description</th>' +
+      '<th class="num" style="width:66px">Price</th><th class="num" style="width:78px">Need</th>' +
+      '<th class="num" style="width:52px">W%</th><th class="num" style="width:100px">Buy</th>' +
+      '<th class="num" style="width:82px">Amt</th></tr></thead><tbody>';
+    const mark = { job: '↑', material: '▪', line: '✎' };
+    for (const g of gs) {
+      h += '<tr data-grp="' + esc(g.key) + '">' +
+        '<td class="code">' + esc(g.code) + '</td>' +
+        '<td class="dim">' + esc(g.unit) + '</td>' +
+        '<td>' + esc(g.label) + (g.flags.length ? ' <span class="tag" style="color:#8a4b09">!</span>' : '') +
+          (g.areaOnly ? ' <span class="tag">area est</span>' : '') + '</td>' +
+        '<td class="num">' + (g.price == null ? '—' : g.price.toFixed(2)) + '</td>' +
+        '<td class="num dim">' + esc(g.needLabel) + '</td>' +
+        '<td class="num ed" data-waste="' + esc(g.key) + '">' + g.wastePct + mark[g.wasteOrigin] + '</td>' +
+        '<td class="num">' + esc(g.buyLabel) + '</td>' +
+        '<td class="num">' + money(g.amount) + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+
+  // entries strip
+  const seen = new Set(); let ent = '';
+  for (const line of j.lines) {
+    if (line.runId) {
+      if (seen.has(line.runId)) continue;
+      seen.add(line.runId);
+      const n = j.lines.filter(l => l.runId === line.runId).length;
+      ent += '<div class="entry"><span class="tag r">recipe</span>' +
+        '<b>' + esc(line.runLabel || 'run') + '</b>' +
+        '<span class="dim">' + esc(line.runDesc || '') + '</span>' +
+        '<span class="dim">' + n + ' parts</span><div class="spring"></div>' +
+        '<button class="btn" data-redo="' + line.runId + '">edit</button>' +
+        '<button class="x" data-delrun="' + line.runId + '">✕</button></div>';
+    } else {
+      ent += '<div class="entry"><span class="tag">manual</span>' +
+        '<b>' + esc(line.label || '') + '</b>' +
+        '<span class="dim">' + esc(demandLabel(line)) + '</span><div class="spring"></div>' +
+        '<button class="x" data-delline="' + line.id + '">✕</button></div>';
+    }
+  }
+  if (ent) h += '<div id="entries"><div class="shead" style="position:static"><h2>Entries</h2></div>' + ent + '</div>';
+  return h;
+}
+
+function demandLabel(line) {
+  const d = line.demand;
+  if (d.mode === 'bulk') return (Math.round(d.qty * 100) / 100) + ' ' +
+    (d.unit === 'lf' ? 'lf' : d.unit === 'sf' ? 'sf' : 'units');
+  if (d.mode === 'pieces') return d.pieces.map(p => p.qty + ' @ ' + fmtLenTight(p.len)).join(', ');
+  return d.panels.map(p => p.qty + ' @ ' + fmtLenTight(p.w) + '×' + fmtLenTight(p.h)).join(', ');
+}
+
+/* ---------- RAIL (the instrument panel) ---------- */
+function viewRail() {
+  if (!CALC || !CALC.catalog) return '<div class="panel"><h3>Cost</h3><div class="kv"><span class="k">—</span></div></div>';
+  const gs = CALC.groups;
+  let h = '<div class="panel"><h3>Yield</h3>';
+  const withYield = gs.filter(g => g.yield != null && isFinite(g.yield) && g.buys.length);
+  if (!withYield.length) h += '<div class="dim">nothing bought yet</div>';
+  for (const g of withYield) {
+    const pct = clamp(Math.round(g.yield * 100), 0, 100);
+    const cls = pct >= 90 ? 'good' : pct >= 75 ? '' : pct >= 60 ? 'warn' : 'bad';
+    const off = g.kind === 'linear'
+      ? (g.offcutLf > 0 ? 'offcut ' + fmtLf(g.offcutLf) : 'no offcut')
+      : (g.offcutSf > 0 ? 'offcut ' + fmtSf(g.offcutSf) : 'no offcut');
+    h += '<div class="meter"><div class="lbl"><b>' + esc(g.label) + '</b><span>' + pct + '</span></div>' +
+      '<div class="bar"><i class="' + cls + '" style="width:' + pct + '%"></i></div>' +
+      '<div class="sub">' + esc(g.buyLabel) + ' · ' + off +
+      (g.longOffcuts && g.longOffcuts.length ? ' · ' + g.longOffcuts.length + ' rackable' : '') +
+      '</div></div>';
+  }
+  h += '</div>';
+
+  h += '<div class="panel"><h3>Cost</h3>';
+  h += '<div class="kv"><span class="k">MATL</span><span class="num">' + money(CALC.subtotal) + '</span></div>';
+  for (const [code, amt] of Object.entries(CALC.taxes)) {
+    const rate = (CALC.catalog.taxRates || {})[code];
+    h += '<div class="kv"><span class="k">' + esc(code) + (rate ? ' ' + (rate * 100).toFixed(0) + '%' : '') +
+      '</span><span class="num">' + money(amt) + '</span></div>';
+  }
+  h += '<div class="kv tot"><span>TOT</span><span class="num">' + money(CALC.total) + '</span></div>';
+
+  const j = activeJob();
+  const runs = {};
+  for (const l of j.lines) if (l.runId && l.recipeId) runs[l.runId] = l;
+  const ids = Object.values(runs).map(l => l.recipeId);
+  if (ids.length && ids.every(i => i === ids[0])) {
+    const units = Object.values(runs).reduce((a, l) => a + (+(String(l.runLabel || '').match(/×(\d+)/) || [0, 0])[1] || 0), 0);
+    const rec = recipeById(ids[0]);
+    if (units > 0 && rec) h += '<div class="kv sub2"><span class="k">/' +
+      esc(rec.name.split(' ').pop().toLowerCase()) + ' ×' + units + '</span><span class="num">' +
+      money(CALC.total / units) + '</span></div>';
+  }
+  h += '</div>';
+
+  const flags = CALC.flags.concat.apply(CALC.flags, gs.map(g => g.flags.map(f => g.label + ': ' + f)));
+  if (flags.length) {
+    h += '<div class="panel"><h3>Check</h3>';
+    for (const f of flags) h += '<span class="flag">' + esc(f) + '</span>';
+    h += '</div>';
+  }
+  const cat = CALC.catalog;
+  const stale = cat && cat.pricedAt ? Math.round((Date.now() - new Date(cat.pricedAt)) / 864e5) : null;
+  if (stale != null && stale > 120) h += '<div class="panel"><h3>Source</h3><span class="flag">' +
+    'This price list is ' + stale + ' days old (' + esc(cat.pricedAt) + '). Re-import before you quote off it.</span></div>';
+  return h;
+}
+
+/* ---------- CATALOG ---------- */
+function viewCatalog() {
+  const cat = activeCatalog();
+  if (!cat) return '<div class="empty"><b>No price list yet</b>' +
+    'Drop in a supplier PDF, paste a spreadsheet, or add rows by hand.<br>' +
+    '<button class="btn pri" data-act="import" style="margin-top:12px">Import a price list</button></div>';
+  const q = State.search.toLowerCase();
+  const items = cat.items.filter(i => !q ||
+    (i.code + ' ' + i.description + ' ' + i.unit).toLowerCase().includes(q));
+  const needing = cat.items.filter(i => stockNeedsReview(i.stock)).length;
+  let h = '<div class="shead"><h2>Catalog</h2>' +
+    '<input class="search" id="catSearch" placeholder="filter…" value="' + esc(State.search) + '">' +
+    '<span class="n">' + items.length + ' / ' + cat.items.length +
+    (needing ? ' · ' + needing + ' need a stock size' : '') + '</span>' +
+    '<div class="spring"></div>' +
+    (DB.catalogs.length > 1 ? catalogPicker() : '') +
+    '<button class="btn" data-act="newitem">+ row</button>' +
+    '<button class="btn" data-act="import">import</button></div>';
+  h += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+    '<th style="width:100px">Code</th><th style="width:36px">U</th><th>Description</th>' +
+    '<th style="width:132px">Stock</th><th style="width:150px">Class</th>' +
+    '<th class="num" style="width:44px">Tax</th><th class="num" style="width:54px">W%</th>' +
+    '<th class="num" style="width:76px">Price</th><th style="width:26px"></th></tr></thead><tbody>';
+  for (const i of items) {
+    const need = stockNeedsReview(i.stock);
+    h += '<tr data-item="' + i.id + '">' +
+      '<td class="code ed" data-f="code">' + esc(i.code) + '</td>' +
+      '<td class="dim ed" data-f="unit">' + esc(i.unit) + '</td>' +
+      '<td class="ed" data-f="description">' + esc(i.description) + '</td>' +
+      '<td class="ed' + (need ? '' : ' dim') + '" data-f="stock"' + (need ? ' style="color:#8a4b09"' : '') + '>' +
+        esc(stockLabel(i.stock)) + (need ? ' ?' : '') + '</td>' +
+      '<td class="ed dim" data-f="class">' + esc(classLabelOf(i) || '—') + '</td>' +
+      '<td class="num dim">' + esc(i.taxCode || '') + '</td>' +
+      '<td class="num ed" data-f="wastePct">' + (i.wastePct == null ? '—' : i.wastePct) + '</td>' +
+      '<td class="num ed" data-f="price">' + i.price.toFixed(2) + '</td>' +
+      '<td><button class="x" data-delitem="' + i.id + '">✕</button></td></tr>';
+  }
+  h += '</tbody></table></div>';
+  return h;
+}
+function catalogPicker() {
+  return '<select class="cell" id="catPick">' + DB.catalogs.map(c => {
+    const v = vendorById(c.vendorId);
+    return '<option value="' + c.id + '"' + (c.id === activeCatalog().id ? ' selected' : '') + '>' +
+      esc((v ? v.name : 'vendor') + ' · ' + (c.pricedAt || c.label || '')) + '</option>';
+  }).join('') + '</select>';
+}
+
+/* ---------- RECIPES ---------- */
+function viewRecipes() {
+  let h = '<div class="shead"><h2>Recipes</h2><span class="n">' + DB.recipes.length +
+    '</span><div class="spring"></div>' +
+    '<button class="btn" data-act="newrecipe">+ recipe</button>' +
+    '<button class="btn" data-act="resetrecipes">restore built-ins</button></div>';
+  h += '<div class="tblwrap">';
+  for (const r of DB.recipes) {
+    h += '<div style="border-bottom:1px solid var(--border);padding:9px 11px;background:var(--bg-panel)">' +
+      '<div style="display:flex;align-items:center;gap:9px">' +
+      '<b style="font-size:12px">' + esc(r.name) + '</b>' +
+      (r.builtin ? '<span class="tag">built-in</span>' : '') +
+      '<span class="dim">' + esc(r.note || '') + '</span><div class="spring"></div>' +
+      '<button class="btn" data-runrecipe="' + r.id + '">run</button>' +
+      '<button class="btn" data-editrecipe="' + r.id + '">edit</button>' +
+      '<button class="btn" data-duprecipe="' + r.id + '">duplicate</button>' +
+      (r.builtin ? '' : '<button class="btn danger" data-delrecipe="' + r.id + '">delete</button>') +
+      '</div><div class="dim" style="margin-top:5px;font-size:10.5px">' +
+      'params: ' + r.params.map(p => esc(p.key)).join(', ') + ' · qty' +
+      ' &nbsp;|&nbsp; binds: ' + r.binds.map(b => esc(b.key)).join(', ') +
+      ' &nbsp;|&nbsp; ' + r.parts.length + ' parts</div></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+/* ---------- CUT LIST ---------- */
+function viewCutList() {
+  if (!CALC || !CALC.catalog) return '<div class="empty"><b>Nothing to cut</b>Load a price list and build a job first.</div>';
+  const lin = CALC.groups.filter(g => g.kind === 'linear' && g.nest && g.nest.bins.length);
+  const sh = CALC.groups.filter(g => g.kind === 'sheet' && g.buys.length);
+  let h = '<div class="shead"><h2>Cut list</h2><span class="n">' +
+    lin.length + ' nested · ' + sh.length + ' sheet</span><div class="spring"></div>' +
+    '<button class="btn" data-act="csv">export CSV</button></div><div class="tblwrap">';
+  if (!lin.length && !sh.length) h += '<div class="empty">No pieces yet — run a recipe to get cut lengths.</div>';
+
+  for (const g of lin) {
+    h += '<table class="grid"><thead><tr><th colspan="4">' + esc(g.label) +
+      ' — ' + esc(g.buyLabel) + ' · yield ' + Math.round((g.yield || 0) * 100) + '%</th></tr>' +
+      '<tr><th style="width:52px">Stick</th><th style="width:60px">Stock</th><th>Cuts</th>' +
+      '<th class="num" style="width:96px">Offcut</th></tr></thead><tbody>';
+    g.nest.bins.forEach((b, i) => {
+      h += '<tr><td class="dim">#' + String(i + 1).padStart(2, '0') + '</td>' +
+        '<td class="dim">' + b.len + "'</td>" +
+        '<td class="wide">' + b.cuts.map(c => fmtLenTight(c)).join('  ·  ') + '</td>' +
+        '<td class="num' + (b.rem >= 2 ? '' : ' dim') + '">' + fmtLenTight(b.rem) +
+        (b.rem >= 2 ? ' <span class="tag">rack</span>' : '') + '</td></tr>';
+    });
+    const extra = g.sticks - g.nest.bins.length;
+    if (extra > 0) h += '<tr><td class="dim">+' + extra + '</td><td colspan="3" class="dim">' +
+      'waste allowance at ' + g.wastePct + '% — uncut spare</td></tr>';
+    h += '</tbody></table>';
+  }
+  for (const g of sh) {
+    h += '<table class="grid"><thead><tr><th colspan="4">' + esc(g.label) +
+      ' — ' + esc(g.buyLabel) + ' · area estimate, not a layout</th></tr>' +
+      '<tr><th>Panel</th><th class="num" style="width:60px">Qty</th>' +
+      '<th style="width:110px">From sheet</th><th class="num" style="width:96px">Per sheet</th></tr></thead><tbody>';
+    for (const p of g.panels) {
+      const it = g.buys[0] ? g.buys[0].item : null;
+      const pps = it ? panelsPerSheet(p.w, p.h, it.stock.w, it.stock.h) : 0;
+      h += '<tr><td>' + esc(p.label || 'panel') + ' &nbsp;<span class="dim">' +
+        fmtLenTight(p.w) + ' × ' + fmtLenTight(p.h) + '</span></td>' +
+        '<td class="num">' + p.qty + '</td>' +
+        '<td class="dim">' + (it ? it.stock.w + '×' + it.stock.h : '—') + '</td>' +
+        '<td class="num' + (pps ? '' : ' dim') + '">' + (pps || 'does not fit') + '</td></tr>';
+    }
+    h += '</tbody></table>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function cutListCSV() {
+  const rows = [['Element', 'Material', 'Piece', 'Qty', 'Length (ft)', 'Width (ft)', 'Notes']];
+  const j = activeJob();
+  for (const line of j.lines) {
+    const g = CALC.groups.find(x => x.sources.includes(line));
+    const mat = g ? g.label : '';
+    const el = line.runLabel || 'Manual';
+    const d = line.demand;
+    if (d.mode === 'pieces') for (const p of d.pieces)
+      rows.push([el, mat, p.label || line.label, p.qty, p.len.toFixed(3), '0.000', fmtLenTight(p.len, 'frac')]);
+    else if (d.mode === 'panels') for (const p of d.panels)
+      rows.push([el, mat, p.label || line.label, p.qty, p.h.toFixed(3), p.w.toFixed(3),
+        fmtLenTight(p.w, 'frac') + '×' + fmtLenTight(p.h, 'frac')]);
+    else rows.push([el, mat, line.label, d.qty, '0.000', '0.000', (d.unit || 'units')]);
+  }
+  return rows.map(r => r.map(c => {
+    const s = String(c);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(',')).join('\n');
+}
+
+function download(name, text, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: mime || 'text/plain' }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---------- VENDORS ---------- */
+function viewVendors() {
+  let h = '<div class="shead"><h2>Vendors</h2><span class="n">' + DB.vendors.length +
+    '</span><div class="spring"></div><button class="btn" data-act="import">import a price list</button></div>';
+  if (!DB.vendors.length) return h + '<div class="empty"><b>No vendors</b>A vendor is created when you import their price list.</div>';
+  h += '<div class="tblwrap"><table class="grid"><thead><tr><th>Vendor</th><th>Contact</th>' +
+    '<th style="width:100px">Price lists</th><th style="width:110px">Latest</th>' +
+    '<th class="num" style="width:70px">Items</th><th style="width:26px"></th></tr></thead><tbody>';
+  for (const v of DB.vendors) {
+    const cats = DB.catalogs.filter(c => c.vendorId === v.id);
+    const latest = cats.map(c => c.pricedAt).filter(Boolean).sort().pop() || '—';
+    h += '<tr data-vendor="' + v.id + '">' +
+      '<td class="ed" data-f="name"><b>' + esc(v.name) + '</b></td>' +
+      '<td class="dim">' + esc([v.phone, v.email].filter(Boolean).join(' · ')) + '</td>' +
+      '<td class="dim">' + cats.length + '</td><td class="dim">' + esc(latest) + '</td>' +
+      '<td class="num dim">' + cats.reduce((a, c) => a + c.items.length, 0) + '</td>' +
+      '<td><button class="x" data-delvendor="' + v.id + '">✕</button></td></tr>';
+  }
+  h += '</tbody></table></div>';
+  return h;
+}
+
+/* ==================================================================
+   MODALS
+   ================================================================== */
+let modalState = null;
+
+function modal(html, wire) {
+  const v = $('#veil');
+  v.innerHTML = html;
+  v.classList.remove('hide');
+  if (wire) wire(v);
+  const f = v.querySelector('input,select,textarea,button');
+  if (f) setTimeout(() => f.focus(), 20);
+}
+function closeModal() { $('#veil').classList.add('hide'); $('#veil').innerHTML = ''; modalState = null; }
+
+/* ---------- import ---------- */
+function openImport() {
+  modal(
+   '<div class="modal md"><div class="mhead"><h2>Import a price list</h2><div class="spring"></div>' +
+   '<button class="btn" data-close>close</button></div><div class="mbody">' +
+   '<div class="drop" id="drop">Drop a supplier <b>PDF</b> here, or <button class="btn" id="pick">choose a file</button>' +
+   '<br><span class="dim">Text PDFs only — a scan has nothing to read.</span></div>' +
+   '<div class="field" style="margin-top:14px"><label>or paste rows from a spreadsheet</label>' +
+   '<textarea class="paste" id="pasteBox" placeholder="code&#9;unit&#9;description&#9;tax&#9;price"></textarea>' +
+   '<div class="hint">Tab or comma separated. A header row is detected if present; ' +
+   'otherwise columns are read as code, unit, description, tax, price.</div></div>' +
+   '<input type="file" id="fileIn" accept="application/pdf,.pdf,.csv,.txt" class="hide">' +
+   '</div><div class="mfoot"><button class="btn pri" id="doPaste">Read pasted rows</button>' +
+   '<div class="spring"></div><span class="dim" id="impMsg"></span></div></div>',
+  (v) => {
+    const drop = $('#drop', v), file = $('#fileIn', v);
+    $('#pick', v).onclick = () => file.click();
+    file.onchange = () => file.files[0] && handleImportFile(file.files[0]);
+    ['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, (ev) => {
+      ev.preventDefault(); drop.classList.add('hot');
+    }));
+    ['dragleave', 'drop'].forEach(e => drop.addEventListener(e, (ev) => {
+      ev.preventDefault(); drop.classList.remove('hot');
+    }));
+    drop.addEventListener('drop', (ev) => {
+      const f = ev.dataTransfer.files[0]; if (f) handleImportFile(f);
+    });
+    $('#doPaste', v).onclick = () => {
+      const rows = parseDelimited($('#pasteBox', v).value);
+      if (rows.length < 1) return toast('Nothing to read');
+      openReview(rowsToItems(rows), { vendorName: '', label: '', pricedAt: todayISO() }, 'paste');
+    };
+  });
+}
+
+async function handleImportFile(file) {
+  $('#impMsg').textContent = 'reading ' + file.name + '…';
+  try {
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+      const buf = await file.arrayBuffer();
+      const out = await parseVendorPDF(buf);
+      openReview(out.items.map(withInference), Object.assign({ file: file.name }, out.meta), 'pdf', out);
+    } else {
+      const text = await file.text();
+      openReview(rowsToItems(parseDelimited(text)), { vendorName: '', label: '', pricedAt: todayISO(), file: file.name }, 'csv');
+    }
+  } catch (e) {
+    $('#impMsg').innerHTML = '<span style="color:var(--accent)">' + esc(e.message) + '</span>';
+  }
+}
+
+function rowsToItems(rows) {
+  if (!rows.length) return [];
+  let start = 0;
+  const head = rows[0].map(c => c.toLowerCase());
+  const idx = { code: 0, unit: 1, description: 2, taxCode: 3, price: 4 };
+  const looksHeader = head.some(c => /item|code|sku|part/.test(c)) && head.some(c => /price|cost|rate/.test(c));
+  if (looksHeader) {
+    start = 1;
+    head.forEach((c, i) => {
+      if (/item|code|sku|part/.test(c)) idx.code = i;
+      else if (/^unit$|uom|u\/m/.test(c)) idx.unit = i;
+      else if (/desc|name|material/.test(c)) idx.description = i;
+      else if (/tax/.test(c)) idx.taxCode = i;
+      else if (/price|cost|rate|each/.test(c)) idx.price = i;
+    });
+  }
+  const out = [];
+  for (let r = start; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row.length || !row.join('').trim()) continue;
+    const price = numOf(row[idx.price]);
+    if (price == null) continue;
+    out.push(withInference({
+      code: row[idx.code] || 'ROW' + r,
+      unit: (row[idx.unit] || '').replace(/\.$/, ''),
+      description: row[idx.description] || '',
+      taxCode: (row[idx.taxCode] || 'H').toUpperCase().slice(0, 1),
+      price,
+    }));
+  }
+  return out;
+}
+
+function withInference(raw) {
+  return Object.assign({}, raw, {
+    id: uid(),
+    stock: inferStock(raw.description, raw.unit, raw.code),
+    wastePct: null, classOverride: null,
+  });
+}
+
+/* ---------- review ---------- */
+function openReview(items, meta, source, extra) {
+  if (!items.length) { toast('No priced rows found'); return; }
+  const guessVendor = DB.vendors.find(v =>
+    meta.vendorName && v.name.toLowerCase() === String(meta.vendorName).toLowerCase());
+  const existing = guessVendor ? DB.catalogs.filter(c => c.vendorId === guessVendor.id) : [];
+  modalState = { items, meta, source, existing };
+
+  const need = items.filter(i => stockNeedsReview(i.stock)).length;
+  const kinds = { linear: 0, sheet: 0, unit: 0 };
+  for (const i of items) kinds[i.stock ? i.stock.kind : 'unit']++;
+
+  let diffHTML = '';
+  if (existing.length) {
+    const target = existing[0];
+    const byCode = new Map(target.items.map(i => [i.code, i]));
+    let upd = 0, same = 0, add = 0, moved = [];
+    for (const i of items) {
+      const e = byCode.get(i.code);
+      if (!e) add++;
+      else if (Math.abs(e.price - i.price) > 0.001) { upd++; moved.push([i.code, e.price, i.price]); }
+      else same++;
+    }
+    const gone = target.items.filter(i => !items.some(x => x.code === i.code)).length;
+    modalState.target = target;
+    diffHTML = '<div class="field"><label>This vendor already has a list</label>' +
+      '<label style="text-transform:none;letter-spacing:0;font-weight:400;display:block;margin-bottom:3px">' +
+      '<input type="radio" name="mode" value="update" checked> <b>Update prices</b> in the existing list — ' +
+      upd + ' changed, ' + add + ' new, ' + same + ' unchanged, ' + gone + ' not in this list. ' +
+      'Hand-corrected stock sizes, classes and waste are kept.</label>' +
+      '<label style="text-transform:none;letter-spacing:0;font-weight:400;display:block">' +
+      '<input type="radio" name="mode" value="new"> Keep both — add this as a separate list.</label>' +
+      (moved.length ? '<pre class="log" style="max-height:120px;margin-top:7px">' +
+        moved.slice(0, 40).map(m => m[0].padEnd(14) + m[1].toFixed(2).padStart(9) + '  →' +
+          m[2].toFixed(2).padStart(9) + '   ' +
+          ((m[2] - m[1]) / m[1] * 100 >= 0 ? '+' : '') + ((m[2] - m[1]) / m[1] * 100).toFixed(1) + '%').join('\n') +
+        (moved.length > 40 ? '\n… ' + (moved.length - 40) + ' more' : '') + '</pre>' : '') +
+      '</div>';
+  }
+
+  let rows = '';
+  items.forEach((i, n) => {
+    const nr = stockNeedsReview(i.stock);
+    rows += '<tr data-rev="' + n + '"' + (nr ? ' class="sel"' : '') + '>' +
+      '<td class="code">' + esc(i.code) + '</td><td class="dim">' + esc(i.unit) + '</td>' +
+      '<td>' + esc(i.description) + '</td>' +
+      '<td class="ed" data-rf="stock"' + (nr ? ' style="color:#8a4b09"' : '') + '>' +
+        esc(stockLabel(i.stock)) + (nr ? ' ?' : '') + '</td>' +
+      '<td class="dim">' + esc(classLabelOf(i) || '—') + '</td>' +
+      '<td class="num">' + i.price.toFixed(2) + '</td></tr>';
+  });
+
+  modal(
+   '<div class="modal"><div class="mhead"><h2>Review before import</h2>' +
+   '<span class="dim">' + items.length + ' items · ' + kinds.linear + ' linear · ' +
+   kinds.sheet + ' sheet · ' + kinds.unit + ' by the unit' +
+   (extra && extra.dupes && extra.dupes.length
+     ? ' · ' + extra.rowCount + ' rows read, ' + extra.dupes.length + ' repeated SKU' +
+       (extra.dupes.length === 1 ? '' : 's') + ' collapsed' : '') + '</span>' +
+   '<div class="spring"></div><button class="btn" data-close>cancel</button></div>' +
+   '<div class="mbody">' +
+   (need ? '<span class="flag">' + need + ' row' + (need === 1 ? '' : 's') +
+     ' could not be read confidently — highlighted below. Click the Stock cell to fix ' +
+     '(<code>1x3 ×16</code> for a 16&#39; stick of 1×3, <code>3/4 4×8</code> for a sheet, ' +
+     '<code>-</code> for something sold by the unit).</span>' : '') +
+   '<div class="cols" style="margin-top:11px">' +
+   '<div class="field"><label>Vendor</label><input type="text" id="rvVendor" value="' +
+     esc(meta.vendorName || (guessVendor ? guessVendor.name : '')) + '" placeholder="Vendor name"></div>' +
+   '<div class="field"><label>List label</label><input type="text" id="rvLabel" value="' +
+     esc(meta.label || '') + '" placeholder="REGULAR PRICING"></div>' +
+   '<div class="field"><label>Priced on</label><input type="text" id="rvDate" value="' +
+     esc(meta.pricedAt || todayISO()) + '" placeholder="YYYY-MM-DD"></div>' +
+   '<div class="field"><label>Tax</label><input type="text" id="rvTax" value="' +
+     esc(Object.entries(meta.taxRates || { H: 0.13 }).map(([k, r]) => k + '=' + (r * 100)).join(' ')) +
+     '" placeholder="H=13"></div></div>' +
+   diffHTML +
+   '<div style="max-height:44vh;overflow:auto;border:1px solid var(--border);border-radius:6px">' +
+   '<table class="grid"><thead><tr><th style="width:100px">Code</th><th style="width:36px">U</th>' +
+   '<th>Description</th><th style="width:130px">Stock</th><th style="width:150px">Class</th>' +
+   '<th class="num" style="width:70px">Price</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+   '</div><div class="mfoot"><button class="btn pri" id="rvGo">Import ' + items.length + ' rows</button>' +
+   '<button class="btn" data-close>cancel</button><div class="spring"></div>' +
+   (meta.grossSum ? '<span class="dim">rows as printed total ' + money(meta.grossSum) +
+     ' — check it against the document</span>&nbsp;&nbsp;' : '') +
+   (meta.file ? '<span class="dim">' + esc(meta.file) + '</span>' : '') + '</div></div>',
+  (v) => {
+    $('#rvGo', v).onclick = commitImport;
+    v.addEventListener('click', (e) => {
+      const td = e.target.closest('[data-rf="stock"]');
+      if (!td) return;
+      const n = +td.closest('tr').dataset.rev;
+      editCell(td, stockText(modalState.items[n].stock), (val) => {
+        modalState.items[n].stock = parseStockText(val, modalState.items[n]);
+        td.textContent = stockLabel(modalState.items[n].stock);
+        td.style.color = stockNeedsReview(modalState.items[n].stock) ? '#8a4b09' : '';
+        td.closest('tr').cells[4].textContent = classLabelOf(modalState.items[n]) || '—';
+      });
+    });
+  });
+}
+
+function stockText(st) {
+  if (!st) return '-';
+  if (st.kind === 'linear') return (st.nominal || '?') + ' x' + (st.len || '?') + ' ' + (st.species || '');
+  return (st.thick ? fmtThick(st.thick) + ' ' : '') + st.w + 'x' + st.h + ' ' + (st.species || '');
+}
+// "1x3 x16 #1 Pine" | "3/4 4x8 MDF" | "-"
+function parseStockText(val, item) {
+  const s = String(val || '').trim();
+  if (!s || s === '-' || s === '—') return null;
+  let m = s.match(/^(\d{1,2}x\d{1,2}|\d+\/\d+x\d{1,2})\s*[x×]\s*(\d{1,3})\s*'?\s*(.*)$/i);
+  if (m) return { kind: 'linear', nominal: m[1], len: +m[2], species: m[3].trim() || (item.stock && item.stock.species) || item.description, assumedSize: false };
+  m = s.match(/^((?:\d+\s+)?\d+\/\d+|[\d.]+mm|[\d.]+"|[\d.]+)?\s*(\d{1,2})\s*[x×]\s*(\d{1,2})\s*(.*)$/i);
+  if (m && m[2] && m[3]) return { kind: 'sheet', thick: m[1] || null, thickIn: thickToIn(m[1]),
+    w: Math.min(+m[2], +m[3]), h: Math.max(+m[2], +m[3]),
+    species: m[4].trim() || (item.stock && item.stock.species) || item.description, assumedSize: false };
+  return null;
+}
+
+function commitImport() {
+  const v = $('#veil');
+  const name = ($('#rvVendor', v).value || 'Unnamed vendor').trim();
+  const label = $('#rvLabel', v).value.trim();
+  const pricedAt = $('#rvDate', v).value.trim();
+  const taxRates = {};
+  for (const bit of $('#rvTax', v).value.split(/\s+/)) {
+    const m = bit.match(/^([A-Za-z])\s*=\s*([\d.]+)$/);
+    if (m) taxRates[m[1].toUpperCase()] = parseFloat(m[2]) / 100;
+  }
+  const mode = (v.querySelector('input[name=mode]:checked') || {}).value || 'new';
+  const items = modalState.items;
+
+  let vendor = DB.vendors.find(x => x.name.toLowerCase() === name.toLowerCase());
+  if (!vendor) {
+    vendor = { id: uid(), name, phone: modalState.meta.phone || '', email: modalState.meta.email || '', notes: '' };
+    DB.vendors.push(vendor);
+  } else {
+    if (modalState.meta.phone) vendor.phone = modalState.meta.phone;
+    if (modalState.meta.email) vendor.email = modalState.meta.email;
+  }
+
+  let cat, updated = 0, added = 0;
+  if (mode === 'update' && modalState.target) {
+    cat = modalState.target;
+    const byCode = new Map(cat.items.map(i => [i.code, i]));
+    for (const i of items) {
+      const e = byCode.get(i.code);
+      if (e) {
+        if (Math.abs(e.price - i.price) > 0.001) updated++;
+        e.price = i.price;                       // price only — corrections survive
+        e.description = e.description || i.description;
+      } else { cat.items.push(i); added++; }
+    }
+    cat.pricedAt = pricedAt || cat.pricedAt;
+    cat.label = label || cat.label;
+    cat.taxRates = Object.keys(taxRates).length ? taxRates : cat.taxRates;
+    cat.sourceDoc = modalState.meta.file || cat.sourceDoc;
+    cat.importedAt = new Date().toISOString();
+  } else {
+    cat = { id: uid(), vendorId: vendor.id, label, pricedAt,
+      sourceDoc: modalState.meta.file || '', sourceRef: modalState.meta.sourceRef || '',
+      importedAt: new Date().toISOString(),
+      taxRates: Object.keys(taxRates).length ? taxRates : { H: 0.13 },
+      items };
+    DB.catalogs.unshift(cat);
+    added = items.length;
+  }
+  bumpCatalog(cat);
+
+  let j = activeJob() || newJob('Untitled job');
+  if (!j.catalogId || mode === 'new') { j.catalogId = cat.id; j.vendorId = vendor.id; }
+
+  closeModal(); save(); render();
+  toast(mode === 'update'
+    ? updated + ' prices updated, ' + added + ' new rows'
+    : items.length + ' rows imported from ' + vendor.name);
+}
+
+/* ---------- inline cell editing ---------- */
+function editCell(td, value, commit) {
+  if (td._editing) return;
+  td._editing = true;
+  const old = td.innerHTML;
+  td.innerHTML = '<input class="cell" value="' + esc(value) + '">';
+  const inp = td.firstChild;
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = (ok) => {
+    if (done) return; done = true; td._editing = false;
+    if (ok) { commit(inp.value); } else { td.innerHTML = old; }
+  };
+  inp.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    e.stopPropagation();
+  };
+  inp.onblur = () => finish(true);
+}
+
+/* ---------- add material ---------- */
+function openAdd() {
+  const cat = activeCatalog();
+  if (!cat) return openImport();
+  modalState = { pick: null };
+  modal(
+   '<div class="modal md"><div class="mhead"><h2>Add material</h2><div class="spring"></div>' +
+   '<button class="btn" data-close>close</button></div>' +
+   '<div class="mbody flush"><div style="padding:10px 12px;border-bottom:1px solid var(--border)">' +
+   '<input class="search" id="addSearch" style="max-width:none;width:100%" placeholder="search code or description…"></div>' +
+   '<div id="addList" style="max-height:52vh;overflow:auto"></div></div>' +
+   '<div class="mfoot"><span class="dim" id="addPick">nothing selected</span><div class="spring"></div>' +
+   '<input class="mini" id="addQty" style="width:80px" value="1"><span class="dim" id="addUnit"></span>' +
+   '<button class="btn pri" id="addGo" disabled>Add</button></div></div>',
+  (v) => {
+    const draw = () => {
+      const q = $('#addSearch', v).value.toLowerCase();
+      const classes = Array.from(classesOf(cat).values())
+        .filter(c => !q || c.label.toLowerCase().includes(q));
+      const items = cat.items.filter(i => !q || (i.code + ' ' + i.description).toLowerCase().includes(q));
+      let h = '<table class="grid"><tbody>';
+      if (classes.length) h += '<tr class="grp"><td colspan="4">Material classes — nested and priced across stock sizes</td></tr>';
+      for (const c of classes.slice(0, 60)) {
+        h += '<tr data-cls="' + esc(c.key) + '"><td><b>' + esc(c.label) + '</b></td>' +
+          '<td class="dim">' + esc(c.kind) + '</td>' +
+          '<td class="dim">' + (c.kind === 'linear'
+            ? (c.lengths.length ? c.lengths.map(l => l + "'").join(' ') : 'no stock length')
+            : Array.from(new Set(c.sizes)).join(' ')) + '</td>' +
+          '<td class="num dim">' + c.items.length + ' rows</td></tr>';
+      }
+      h += '<tr class="grp"><td colspan="4">Catalogue rows — bought exactly as listed</td></tr>';
+      for (const i of items.slice(0, 200)) {
+        h += '<tr data-itm="' + i.id + '"><td class="code">' + esc(i.code) + '</td>' +
+          '<td>' + esc(i.description) + '</td><td class="dim">' + esc(i.unit) + '</td>' +
+          '<td class="num">' + i.price.toFixed(2) + '</td></tr>';
+      }
+      h += '</tbody></table>';
+      $('#addList', v).innerHTML = h;
+    };
+    draw();
+    $('#addSearch', v).oninput = draw;
+    $('#addList', v).addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-cls],tr[data-itm]');
+      if (!tr) return;
+      $$('#addList tr', v).forEach(x => x.classList.remove('sel'));
+      tr.classList.add('sel');
+      if (tr.dataset.cls) {
+        const c = classesOf(cat).get(tr.dataset.cls);
+        modalState.pick = { type: 'class', key: c.key, label: c.label,
+          unit: c.kind === 'linear' ? 'lf' : 'sf' };
+      } else {
+        const i = itemById(cat, tr.dataset.itm);
+        modalState.pick = { type: 'item', itemId: i.id, label: i.description, unit: 'unit', unitLabel: i.unit };
+      }
+      $('#addPick', v).textContent = modalState.pick.label;
+      $('#addUnit', v).textContent = modalState.pick.unitLabel || modalState.pick.unit;
+      $('#addGo', v).disabled = false;
+    });
+    $('#addGo', v).onclick = () => {
+      const p = modalState.pick; if (!p) return;
+      const qty = p.unit === 'unit' ? parseFloat($('#addQty', v).value) : parseLen($('#addQty', v).value);
+      if (!(qty > 0)) return toast('Enter a quantity');
+      const j = activeJob();
+      j.lines.push({ id: uid(), source: 'manual', label: p.label,
+        target: p.type === 'class' ? { type: 'class', key: p.key } : { type: 'item', itemId: p.itemId },
+        demand: { mode: 'bulk', qty, unit: p.unit }, wastePctOverride: null });
+      closeModal(); touchJob(); render();
+    };
+  });
+}
+
+/* ---------- run a recipe ---------- */
+function openRun(recipeId, editRunId) {
+  const cat = activeCatalog();
+  if (!cat) return openImport();
+  if (!DB.recipes.length) { toast('No recipes'); return; }
+  const j = activeJob();
+  let prior = null;
+  if (editRunId) prior = j.lines.find(l => l.runId === editRunId);
+  const rec = recipeById(recipeId || (prior && prior.recipeId) || DB.recipes[0].id) || DB.recipes[0];
+  const classes = Array.from(classesOf(cat).values());
+  modalState = { rec, editRunId };
+
+  const bindOptions = (b) => {
+    const pool = b.kind === 'unit'
+      ? cat.items.map(i => ({ key: 'I:' + i.id, label: i.description + '  ·  ' + i.code }))
+      : classes.filter(c => c.kind === b.kind).map(c => ({ key: 'C:' + c.key, label: c.label }));
+    let sel = prior && prior.runBinds && prior.runBinds[b.key]
+      ? (prior.runBinds[b.key].type === 'class' ? 'C:' + prior.runBinds[b.key].key : 'I:' + prior.runBinds[b.key].itemId)
+      : null;
+    if (!sel && b.hint) {
+      const hit = pool.find(o => o.label.toLowerCase().includes(b.hint.toLowerCase()));
+      if (hit) sel = hit.key;
+    }
+    if (!sel && pool.length) sel = pool[0].key;
+    return '<select id="bind_' + b.key + '">' +
+      (pool.length ? '' : '<option value="">— nothing of this kind in the catalogue —</option>') +
+      pool.map(o => '<option value="' + esc(o.key) + '"' + (o.key === sel ? ' selected' : '') + '>' +
+        esc(o.label) + '</option>').join('') + '</select>';
+  };
+
+  modal(
+   '<div class="modal md"><div class="mhead"><h2>' + (editRunId ? 'Edit run' : 'Run recipe') + '</h2>' +
+   '<div class="spring"></div><button class="btn" data-close>close</button></div><div class="mbody">' +
+   '<div class="cols"><div class="field"><label>Recipe</label><select id="recPick">' +
+     DB.recipes.map(r => '<option value="' + r.id + '"' + (r.id === rec.id ? ' selected' : '') + '>' +
+       esc(r.name) + '</option>').join('') + '</select></div>' +
+   '<div class="field"><label>How many</label><input type="text" id="runQty" value="' +
+     (prior ? (String(prior.runLabel).match(/×(\d+)/) || [0, 1])[1] : 1) + '"></div></div>' +
+   '<div class="cols">' + rec.params.map(p =>
+     '<div class="field"><label>' + esc(p.label) + '</label><input type="text" id="par_' + p.key +
+     '" value="' + esc(prior && prior.runValues && prior.runValues[p.key] != null
+        ? (p.type === 'length' ? fmtLenTight(prior.runValues[p.key], 'frac') : prior.runValues[p.key])
+        : (p.type === 'length' ? fmtLenTight(p.default, 'frac') : p.default)) + '">' +
+     '<div class="hint">' + esc(p.key) + (p.type === 'length' ? " — 4'6 1/2, 24\", 4.54" : '') + '</div></div>').join('') +
+   '</div>' +
+   '<div class="cols">' + rec.binds.map(b =>
+     '<div class="field"><label>' + esc(b.label) + '</label>' + bindOptions(b) + '</div>').join('') + '</div>' +
+   '<div class="field"><label>Preview</label><pre class="log" id="runPrev">—</pre></div>' +
+   '</div><div class="mfoot"><button class="btn pri" id="runGo">' +
+   (editRunId ? 'Replace run' : 'Add to job') + '</button>' +
+   '<button class="btn" data-close>cancel</button></div></div>',
+  (v) => {
+    $('#recPick', v).onchange = () => openRun($('#recPick', v).value, editRunId);
+    const gather = () => {
+      const values = {}, binds = {};
+      for (const p of rec.params) {
+        const raw = $('#par_' + p.key, v).value;
+        values[p.key] = p.type === 'length' ? parseLen(raw) : parseFloat(raw);
+      }
+      for (const b of rec.binds) {
+        const sv = $('#bind_' + b.key, v).value;
+        if (!sv) continue;
+        binds[b.key] = sv.startsWith('C:') ? { type: 'class', key: sv.slice(2) } : { type: 'item', itemId: sv.slice(2) };
+      }
+      const count = Math.max(1, Math.round(parseFloat($('#runQty', v).value) || 1));
+      return { values, binds, count };
+    };
+    const preview = () => {
+      const { values, binds, count } = gather();
+      const bad = rec.params.filter(p => values[p.key] == null || isNaN(values[p.key]));
+      if (bad.length) { $('#runPrev', v).innerHTML = '<b class="no">Could not read: ' +
+        esc(bad.map(p => p.label).join(', ')) + '</b>'; return null; }
+      const out = expandRecipe(rec, values, binds, count);
+      let t = '';
+      for (const l of out.lines) {
+        const d = l.demand;
+        t += (l.label.split('—')[1] || l.label).trim().padEnd(20) +
+          (d.mode === 'pieces' ? String(d.pieces[0].qty).padStart(4) + ' @ ' + fmtLenTight(d.pieces[0].len)
+           : d.mode === 'panels' ? String(d.panels[0].qty).padStart(4) + ' @ ' +
+             fmtLenTight(d.panels[0].w) + ' × ' + fmtLenTight(d.panels[0].h)
+           : (Math.round(d.qty * 1000) / 1000) + ' units') + '\n';
+      }
+      if (out.problems.length) t += '\n' + out.problems.map(p => '! ' + p).join('\n');
+      $('#runPrev', v).textContent = t || 'nothing produced';
+      return out;
+    };
+    v.addEventListener('input', preview);
+    v.addEventListener('change', preview);
+    preview();
+    $('#runGo', v).onclick = () => {
+      const { values, binds, count } = gather();
+      const out = preview();
+      if (!out || !out.lines.length) return toast('Nothing to add');
+      const job = activeJob();
+      if (editRunId) job.lines = job.lines.filter(l => l.runId !== editRunId);
+      for (const l of out.lines) { l.runValues = values; l.runBinds = binds; job.lines.push(l); }
+      closeModal(); touchJob(); render();
+      toast(rec.name + ' ×' + count + ' → ' + out.lines.length + ' parts');
+    };
+  });
+}
+
+/* ---------- recipe editor ---------- */
+function openRecipeEdit(id) {
+  const r = JSON.parse(JSON.stringify(recipeById(id)));
+  const partRow = (p, n) => '<tr data-part="' + n + '">' +
+    '<td><input class="cell" data-pf="label" value="' + esc(p.label) + '"></td>' +
+    '<td><input class="cell" data-pf="bind" value="' + esc(p.bind) + '" style="width:66px"></td>' +
+    '<td><select class="cell" data-pf="kind">' + ['linear', 'sheet', 'unit'].map(k =>
+      '<option' + (k === p.kind ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></td>' +
+    '<td><input class="cell" data-pf="qty" value="' + esc(p.qty) + '"></td>' +
+    '<td><input class="cell" data-pf="length" value="' + esc(p.length || '') + '"></td>' +
+    '<td><input class="cell" data-pf="w" value="' + esc(p.w || '') + '" style="width:56px"></td>' +
+    '<td><input class="cell" data-pf="h" value="' + esc(p.h || '') + '" style="width:56px"></td>' +
+    '<td><button class="x" data-delpart="' + n + '">✕</button></td></tr>';
+  modal(
+   '<div class="modal"><div class="mhead"><h2>Recipe</h2><div class="spring"></div>' +
+   '<button class="btn" data-close>close</button></div><div class="mbody">' +
+   '<div class="cols"><div class="field"><label>Name</label><input type="text" id="reName" value="' + esc(r.name) + '"></div>' +
+   '<div class="field" style="flex:2"><label>Note</label><input type="text" id="reNote" value="' + esc(r.note || '') + '"></div></div>' +
+   '<div class="field"><label>Parameters — one per line: <code>key | label | length|number | default</code></label>' +
+   '<textarea id="reParams" style="min-height:70px">' +
+     esc(r.params.map(p => [p.key, p.label, p.type, p.default].join(' | ')).join('\n')) + '</textarea>' +
+   '<div class="hint"><code>qty</code> is always available and means how many units you are building.</div></div>' +
+   '<div class="field"><label>Material slots — one per line: <code>key | label | linear|sheet|unit | hint</code></label>' +
+   '<textarea id="reBinds" style="min-height:60px">' +
+     esc(r.binds.map(b => [b.key, b.label, b.kind, b.hint || ''].join(' | ')).join('\n')) + '</textarea></div>' +
+   '<div class="field"><label>Parts <button class="btn" id="reAddPart">+ part</button></label>' +
+   '<table class="grid"><thead><tr><th>Label</th><th>Slot</th><th>Kind</th><th>Qty (per unit)</th>' +
+   '<th>Length</th><th>W</th><th>H</th><th></th></tr></thead><tbody id="reParts">' +
+     r.parts.map(partRow).join('') + '</tbody></table>' +
+   '<div class="hint">Expressions: <code>+ - * / ( )</code>, <code>min max ceil floor round abs sqrt</code>. ' +
+   'Bare numbers are feet; <code>1.5in</code> and <code>24"</code> convert.</div></div>' +
+   '</div><div class="mfoot"><button class="btn pri" id="reSave">Save</button>' +
+   '<button class="btn" data-close>cancel</button><div class="spring"></div>' +
+   '<span class="dim" id="reMsg"></span></div></div>',
+  (v) => {
+    $('#reAddPart', v).onclick = () => {
+      const n = $$('#reParts tr', v).length;
+      $('#reParts', v).insertAdjacentHTML('beforeend',
+        partRow({ label: 'Part', bind: r.binds[0] ? r.binds[0].key : 'frame', kind: 'linear', qty: '1', length: 'W' }, n));
+    };
+    $('#reParts', v).addEventListener('click', (e) => {
+      const b = e.target.closest('[data-delpart]');
+      if (b) b.closest('tr').remove();
+    });
+    $('#reSave', v).onclick = () => {
+      const parseLines = (txt, keys) => txt.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+        const bits = l.split('|').map(s => s.trim());
+        const o = {}; keys.forEach((k, i) => o[k] = bits[i] || ''); return o;
+      });
+      const params = parseLines($('#reParams', v).value, ['key', 'label', 'type', 'default'])
+        .map(p => ({ key: p.key, label: p.label || p.key, type: p.type === 'number' ? 'number' : 'length',
+          default: p.type === 'number' ? (parseFloat(p.default) || 0) : (parseLen(p.default) || 0) }));
+      const binds = parseLines($('#reBinds', v).value, ['key', 'label', 'kind', 'hint'])
+        .map(b => ({ key: b.key, label: b.label || b.key, kind: b.kind || 'linear', hint: b.hint }));
+      const parts = $$('#reParts tr', v).map(tr => {
+        const o = {};
+        $$('[data-pf]', tr).forEach(el => o[el.dataset.pf] = el.value.trim());
+        return o;
+      }).filter(p => p.label);
+      // validate every expression against the declared names before saving
+      const scope = { qty: 1 }; params.forEach(p => scope[p.key] = p.default || 1);
+      for (const p of parts) {
+        for (const f of ['qty', 'length', 'w', 'h']) {
+          if (!p[f]) continue;
+          try { evalExpr(p[f], scope); }
+          catch (e) { $('#reMsg', v).innerHTML = '<span style="color:var(--accent)">' +
+            esc(p.label + ' · ' + f + ': ' + e.message) + '</span>'; return; }
+        }
+      }
+      const tgt = recipeById(id);
+      Object.assign(tgt, { name: $('#reName', v).value.trim() || 'Recipe',
+        note: $('#reNote', v).value.trim(), params, binds, parts, builtin: false });
+      closeModal(); save(); render(); toast('Recipe saved');
+    };
+  });
+}
+
+/* ---------- jobs & snapshots ---------- */
+function openJobs() {
+  const cur = activeJob();
+  let rows = DB.jobs.map(j => {
+    const t = computeJob(j);
+    return '<tr' + (cur && j.id === cur.id ? ' class="sel"' : '') + ' data-job="' + j.id + '">' +
+      '<td><b>' + esc(j.name) + '</b></td>' +
+      '<td class="dim">' + esc((j.modified || '').slice(0, 10)) + '</td>' +
+      '<td class="num dim">' + j.lines.length + '</td>' +
+      '<td class="num dim">' + (j.snapshots || []).length + '</td>' +
+      '<td class="num">' + money(t.total) + '</td>' +
+      '<td><button class="btn" data-dupjob="' + j.id + '">dup</button> ' +
+      '<button class="x" data-deljob="' + j.id + '">✕</button></td></tr>';
+  }).join('');
+  const snaps = (cur && cur.snapshots || []).map(s =>
+    '<tr><td><b>' + esc(s.label) + '</b></td><td class="dim">' + esc(s.at.slice(0, 16).replace('T', ' ')) +
+    '</td><td class="num">' + money(s.totals.total) + '</td>' +
+    '<td><button class="btn" data-restore="' + s.id + '">restore</button> ' +
+    '<button class="x" data-delsnap="' + s.id + '">✕</button></td></tr>').join('');
+  modal(
+   '<div class="modal md"><div class="mhead"><h2>Jobs</h2><div class="spring"></div>' +
+   '<button class="btn pri" id="jbNew">+ new job</button><button class="btn" data-close>close</button></div>' +
+   '<div class="mbody flush"><table class="grid"><thead><tr><th>Name</th><th style="width:86px">Modified</th>' +
+   '<th class="num" style="width:56px">Lines</th><th class="num" style="width:56px">Snaps</th>' +
+   '<th class="num" style="width:88px">Total</th><th style="width:86px"></th></tr></thead><tbody>' +
+   (rows || '<tr><td colspan="6" class="dim" style="padding:14px">no jobs</td></tr>') + '</tbody></table>' +
+   (snaps ? '<div class="shead" style="position:static"><h2>Snapshots of ' + esc(cur.name) + '</h2></div>' +
+     '<table class="grid"><tbody>' + snaps + '</tbody></table>' : '') +
+   '</div><div class="mfoot"><span class="dim">Snapshots freeze the numbers so you can change assumptions and compare.</span></div></div>',
+  (v) => {
+    $('#jbNew', v).onclick = () => { newJob('Untitled job'); closeModal(); save(); render(); };
+    v.addEventListener('click', (e) => {
+      const d = (s) => { const el = e.target.closest('[' + s + ']'); return el ? el.getAttribute(s) : null; };
+      let id;
+      if ((id = d('data-dupjob'))) {
+        const src = jobById(id);
+        const copy = JSON.parse(JSON.stringify(src));
+        copy.id = uid(); copy.name = src.name + ' copy'; copy.snapshots = [];
+        copy.lines.forEach(l => l.id = uid());
+        DB.jobs.unshift(copy); DB.activeJobId = copy.id;
+        closeModal(); save(); render(); return;
+      }
+      if ((id = d('data-deljob'))) {
+        DB.jobs = DB.jobs.filter(x => x.id !== id);
+        if (DB.activeJobId === id) DB.activeJobId = DB.jobs[0] ? DB.jobs[0].id : null;
+        closeModal(); save(); render(); return;
+      }
+      if ((id = d('data-restore'))) {
+        const s = cur.snapshots.find(x => x.id === id);
+        cur.lines = JSON.parse(JSON.stringify(s.lines));
+        cur.globalWastePct = s.globalWastePct;
+        closeModal(); touchJob(); render(); toast('Restored "' + s.label + '"'); return;
+      }
+      if ((id = d('data-delsnap'))) {
+        cur.snapshots = cur.snapshots.filter(x => x.id !== id);
+        closeModal(); save(); openJobs(); return;
+      }
+      if ((id = d('data-job'))) { DB.activeJobId = id; closeModal(); save(); render(); }
+    });
+  });
+}
+
+function takeSnapshot() {
+  const j = activeJob(); if (!j) return;
+  const label = prompt('Label this snapshot', 'v' + ((j.snapshots || []).length + 1));
+  if (label == null) return;
+  const t = computeJob(j);
+  (j.snapshots = j.snapshots || []).unshift({
+    id: uid(), label: label || ('v' + (j.snapshots.length + 1)), at: new Date().toISOString(),
+    lines: JSON.parse(JSON.stringify(j.lines)), globalWastePct: j.globalWastePct,
+    totals: { subtotal: t.subtotal, taxTotal: t.taxTotal, total: t.total },
+    groups: t.groups.map(g => ({ label: g.label, buyLabel: g.buyLabel, amount: g.amount })),
+  });
+  save(); render(); toast('Snapshot "' + label + '" taken');
+}
+
+function openCompare() {
+  const j = activeJob();
+  if (!j || !(j.snapshots || []).length) { toast('Take a snapshot first'); return; }
+  const t = computeJob(j);
+  const opts = [{ id: '_cur', label: 'current', groups: t.groups.map(g => ({ label: g.label, buyLabel: g.buyLabel, amount: g.amount })), totals: { total: t.total } }]
+    .concat(j.snapshots.map(s => ({ id: s.id, label: s.label, groups: s.groups, totals: s.totals })));
+  const sel = (id, def) => '<select id="' + id + '">' + opts.map(o =>
+    '<option value="' + o.id + '"' + (o.id === def ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select>';
+  modal(
+   '<div class="modal md"><div class="mhead"><h2>Compare</h2><div class="spring"></div>' +
+   '<button class="btn" data-close>close</button></div><div class="mbody">' +
+   '<div class="cols"><div class="field"><label>A</label>' + sel('cmpA', j.snapshots[0].id) + '</div>' +
+   '<div class="field"><label>B</label>' + sel('cmpB', '_cur') + '</div></div>' +
+   '<div id="cmpOut"></div></div></div>',
+  (v) => {
+    const draw = () => {
+      const A = opts.find(o => o.id === $('#cmpA', v).value) || opts[1] || opts[0];
+      const B = opts.find(o => o.id === $('#cmpB', v).value) || opts[0];
+      const keys = Array.from(new Set(A.groups.concat(B.groups).map(g => g.label)));
+      let h = '<table class="grid"><thead><tr><th>Material</th>' +
+        '<th class="num">' + esc(A.label) + '</th><th class="num">' + esc(B.label) + '</th>' +
+        '<th class="num" style="width:90px">Δ</th></tr></thead><tbody>';
+      for (const k of keys) {
+        const a = A.groups.find(g => g.label === k), b = B.groups.find(g => g.label === k);
+        const av = a ? a.amount : 0, bv = b ? b.amount : 0, d = bv - av;
+        h += '<tr><td>' + esc(k) + '</td><td class="num' + (a ? '' : ' dim') + '">' + (a ? money(av) : '—') +
+          '</td><td class="num' + (b ? '' : ' dim') + '">' + (b ? money(bv) : '—') + '</td>' +
+          '<td class="num" style="color:' + (Math.abs(d) < 0.005 ? 'var(--text-dim)' : d > 0 ? 'var(--accent)' : 'var(--green)') +
+          '">' + (Math.abs(d) < 0.005 ? '—' : (d > 0 ? '+' : '') + money(d)) + '</td></tr>';
+      }
+      const d = B.totals.total - A.totals.total;
+      h += '<tr class="grp"><td>TOTAL</td><td class="num">' + money(A.totals.total) + '</td>' +
+        '<td class="num">' + money(B.totals.total) + '</td><td class="num">' +
+        (d > 0 ? '+' : '') + money(d) + '</td></tr></tbody></table>';
+      $('#cmpOut', v).innerHTML = h;
+    };
+    draw();
+    v.addEventListener('change', draw);
+  });
+}
+
+function openHelp() {
+  modal('<div class="modal md"><div class="mhead"><h2>Tally</h2><div class="spring"></div>' +
+   '<button class="btn" data-close>close</button></div><div class="mbody" style="line-height:1.85">' +
+   '<p><b>What it is.</b> An estimating scratchpad, not a quote generator. Manual entry is the spine; ' +
+   'recipes are a helper that drops rows into the job.</p><br>' +
+   '<p><b>Keys.</b> <kbd>/</kbd> add material · <kbd>R</kbd> run recipe · <kbd>S</kbd> snapshot · ' +
+   '<kbd>N</kbd> new job · <kbd>1-5</kbd> tabs · <kbd>U</kbd> flip units · <kbd>Esc</kbd> close</p><br>' +
+   '<p><b>Dimensions.</b> Type them the way you say them: <code>4\'6 1/2</code>, <code>10\'</code>, ' +
+   '<code>24"</code>, <code>4.54</code>. A bare number is feet.</p><br>' +
+   '<p><b>Waste.</b> Resolved per row as line override → material default → job global. ' +
+   'The mark next to the percentage says which won: <code>↑</code> job, <code>▪</code> material, <code>✎</code> line.</p><br>' +
+   '<p><b>What it does not do.</b> No 2D sheet nesting — sheet counts are an area estimate with a ' +
+   'fits/does-not-fit check, and they say so. No cross-vendor comparison yet; each vendor list stands alone.</p><br>' +
+   '<p><b>Storage.</b> IndexedDB, with a localStorage hot slot as the crash survivor. ' +
+   'Nothing leaves this browser. Add <code>?test</code> to the URL to run the self-checks.</p>' +
+   '</div></div>');
+}
+
+/* ==================================================================
+   EVENTS
+   ================================================================== */
+
+function wirePane() {
+  const pane = $('#pane');
+
+  const cs = $('#catSearch');
+  if (cs) cs.oninput = () => {
+    State.search = cs.value;
+    const cat = activeCatalog(); const q = State.search.toLowerCase();
+    $$('#pane tbody tr[data-item]').forEach(tr => {
+      const it = itemById(cat, tr.dataset.item);
+      tr.style.display = (!q || (it.code + ' ' + it.description + ' ' + it.unit).toLowerCase().includes(q)) ? '' : 'none';
+    });
+  };
+  const cp = $('#catPick');
+  if (cp) cp.onchange = () => { const j = activeJob(); if (j) { j.catalogId = cp.value; touchJob(); } render(); };
+
+  pane.onclick = (e) => {
+    const act = e.target.closest('[data-act]');
+    if (act) return paneAction(act.dataset.act);
+
+    let el;
+    if ((el = e.target.closest('[data-waste]'))) {
+      const g = CALC.groups.find(x => x.key === el.dataset.waste);
+      return editCell(el, g.wastePct, (v) => {
+        const n = v.trim() === '' ? null : parseFloat(v);
+        for (const l of g.sources) l.wastePctOverride = (n == null || isNaN(n)) ? null : n;
+        touchJob(); render();
+      });
+    }
+    if ((el = e.target.closest('[data-delline]'))) {
+      const j = activeJob(); j.lines = j.lines.filter(l => l.id !== el.dataset.delline);
+      touchJob(); return render();
+    }
+    if ((el = e.target.closest('[data-delrun]'))) {
+      const j = activeJob(); j.lines = j.lines.filter(l => l.runId !== el.dataset.delrun);
+      touchJob(); return render();
+    }
+    if ((el = e.target.closest('[data-redo]'))) return openRun(null, el.dataset.redo);
+    if ((el = e.target.closest('[data-runrecipe]'))) return openRun(el.dataset.runrecipe);
+    if ((el = e.target.closest('[data-editrecipe]'))) return openRecipeEdit(el.dataset.editrecipe);
+    if ((el = e.target.closest('[data-duprecipe]'))) {
+      const r = JSON.parse(JSON.stringify(recipeById(el.dataset.duprecipe)));
+      r.id = uid(); r.name += ' copy'; r.builtin = false;
+      DB.recipes.push(r); save(); return render();
+    }
+    if ((el = e.target.closest('[data-delrecipe]'))) {
+      DB.recipes = DB.recipes.filter(r => r.id !== el.dataset.delrecipe); save(); return render();
+    }
+    if ((el = e.target.closest('[data-delitem]'))) {
+      const cat = activeCatalog();
+      cat.items = cat.items.filter(i => i.id !== el.dataset.delitem);
+      bumpCatalog(cat); save(); return render();
+    }
+    if ((el = e.target.closest('[data-delvendor]'))) {
+      const id = el.dataset.delvendor;
+      if (!confirm('Delete this vendor and its price lists?')) return;
+      DB.vendors = DB.vendors.filter(v => v.id !== id);
+      DB.catalogs = DB.catalogs.filter(c => c.vendorId !== id);
+      save(); return render();
+    }
+
+    // editable cells
+    const td = e.target.closest('td.ed');
+    if (!td) return;
+    const tr = td.closest('tr');
+    const f = td.dataset.f;
+    if (tr.dataset.item) {
+      const cat = activeCatalog(), it = itemById(cat, tr.dataset.item);
+      const cur = f === 'stock' ? stockText(it.stock)
+        : f === 'class' ? (it.classOverride || classLabelOf(it))
+        : f === 'wastePct' ? (it.wastePct == null ? '' : it.wastePct)
+        : it[f];
+      editCell(td, cur, (v) => {
+        if (f === 'stock') it.stock = parseStockText(v, it);
+        else if (f === 'class') it.classOverride = v.trim() && v.trim() !== classLabelOf(Object.assign({}, it, { classOverride: null })) ? v.trim() : null;
+        else if (f === 'wastePct') it.wastePct = v.trim() === '' ? null : (parseFloat(v) || 0);
+        else if (f === 'price') it.price = parseFloat(v) || 0;
+        else it[f] = v.trim();
+        bumpCatalog(cat); save(); render();
+      });
+    } else if (tr.dataset.vendor) {
+      const ven = vendorById(tr.dataset.vendor);
+      editCell(td, ven[f], (v) => { ven[f] = v.trim(); save(); render(); });
+    }
+  };
+}
+
+function paneAction(a) {
+  if (a === 'import') return openImport();
+  if (a === 'add') return openAdd();
+  if (a === 'run') return openRun();
+  if (a === 'newitem') {
+    const cat = activeCatalog(); if (!cat) return openImport();
+    cat.items.unshift({ id: uid(), code: 'NEW' + (cat.items.length + 1), unit: 'ea',
+      description: 'New material', taxCode: 'H', price: 0, stock: null, wastePct: null, classOverride: null });
+    bumpCatalog(cat); save(); return render();
+  }
+  if (a === 'newrecipe') {
+    const r = { id: uid(), name: 'New recipe', note: '', builtin: false,
+      params: [{ key: 'W', label: 'Width', type: 'length', default: 4 },
+               { key: 'H', label: 'Height', type: 'length', default: 8 }],
+      binds: [{ key: 'frame', label: 'Frame stock', kind: 'linear', hint: '' }],
+      parts: [{ label: 'Part', bind: 'frame', kind: 'linear', qty: '1', length: 'W' }] };
+    DB.recipes.push(r); save(); render(); return openRecipeEdit(r.id);
+  }
+  if (a === 'resetrecipes') {
+    const have = new Set(DB.recipes.map(r => r.id));
+    for (const r of builtinRecipes()) if (!have.has(r.id)) DB.recipes.push(r);
+      else Object.assign(DB.recipes.find(x => x.id === r.id), r);
+    save(); return render();
+  }
+  if (a === 'csv') {
+    download('tally-cutlist-' + todayISO() + '.csv', cutListCSV(), 'text/csv');
+    return toast('Cut list exported');
+  }
+}
+
+function bindGlobal() {
+  $$('.tab').forEach(t => t.onclick = () => {
+    if (t.id === 'btnHelp') return openHelp();
+    State.tab = t.dataset.tab; State.search = ''; render();
+  });
+  $('#btnHelp').onclick = openHelp;
+  $('#btnJobs').onclick = openJobs;
+  $('#btnSnap').onclick = takeSnapshot;
+  $('#btnCompare').onclick = openCompare;
+  $('#uFrac').onclick = () => { State.units = DB.units = 'frac'; save(); render(); };
+  $('#uDec').onclick  = () => { State.units = DB.units = 'dec';  save(); render(); };
+  $('#jobName').oninput = () => { const j = activeJob(); if (j) { j.name = $('#jobName').value; touchJob(); } };
+  $('#globalWaste').onchange = () => {
+    const j = activeJob(); if (!j) return;
+    j.globalWastePct = clamp(parseFloat($('#globalWaste').value) || 0, 0, 200);
+    touchJob(); render();
+  };
+  $('#veil').addEventListener('click', (e) => {
+    if (e.target.id === 'veil' || e.target.closest('[data-close]')) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (!$('#veil').classList.contains('hide')) { e.preventDefault(); closeModal(); } return; }
+    const t = e.target.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!$('#veil').classList.contains('hide')) return;
+    const k = e.key.toLowerCase();
+    if (k === '/') { e.preventDefault(); openAdd(); }
+    else if (k === 'r') { e.preventDefault(); openRun(); }
+    else if (k === 's') { e.preventDefault(); takeSnapshot(); }
+    else if (k === 'n') { e.preventDefault(); newJob('Untitled job'); save(); render(); }
+    else if (k === 'u') { State.units = DB.units = State.units === 'frac' ? 'dec' : 'frac'; save(); render(); }
+    else if (k === '?') openHelp();
+    else if ('12345'.includes(k)) {
+      State.tab = ['job', 'catalog', 'recipes', 'cutlist', 'vendors'][+k - 1]; render();
+    }
+  });
+  window.addEventListener('beforeunload', () => { if (State.dirty) persist(); });
+}
+
+/* ==================================================================
+   TESTS  —  ?test in the URL
+   ================================================================== */
+function runTests() {
+  const T = [];
+  const near = (a, b, tol) => a != null && Math.abs(a - b) < (tol || 1e-9);
+  const t = (name, ok, detail) => T.push({ name, ok: !!ok, detail: detail || '' });
+
+  // --- units ---
+  t("parseLen 4'6 1/2", near(parseLen("4'6 1/2"), 4 + 6.5 / 12), String(parseLen("4'6 1/2")));
+  t("parseLen 4' 6-1/2\"", near(parseLen("4' 6-1/2\""), 4 + 6.5 / 12), String(parseLen("4' 6-1/2\"")));
+  t('parseLen 54.5"', near(parseLen('54.5"'), 54.5 / 12), String(parseLen('54.5"')));
+  t("parseLen 10'", near(parseLen("10'"), 10), String(parseLen("10'")));
+  t('parseLen 4.54', near(parseLen('4.54'), 4.54), String(parseLen('4.54')));
+  t('parseLen 264 is feet', near(parseLen('264'), 264), String(parseLen('264')));
+  t('parseLen 24"', near(parseLen('24"'), 2), String(parseLen('24"')));
+  t('parseLen 1/2"', near(parseLen('1/2"'), 1 / 24), String(parseLen('1/2"')));
+  t('parseLen rubbish -> null', parseLen('four feet') === null, String(parseLen('four feet')));
+  t('parseLen empty -> null', parseLen('') === null, String(parseLen('')));
+  t("fmtLen frac", fmtLen(4 + 6.5 / 12, 'frac') === '4\'-6½"', fmtLen(4 + 6.5 / 12, 'frac'));
+  t("fmtLen whole", fmtLen(10, 'frac') === '10\'-0"', fmtLen(10, 'frac'));
+  t('fmtLen dec', fmtLen(4.54, 'dec') === "4.54'", fmtLen(4.54, 'dec'));
+  t('fmtLenTight sub-foot', fmtLenTight(0.125, 'frac') === '1½"', fmtLenTight(0.125, 'frac'));
+  t('round trip 1/16', near(parseLen(fmtLen(9 + 10.5 / 12, 'frac')), 9 + 10.5 / 12, 1e-6));
+
+  // --- expressions ---
+  t('expr max/ceil', evalExpr('max(2, ceil(W/2)+1)', { W: 4 }) === 3);
+  t('expr inches', near(evalExpr('H - 1.5in', { H: 10 }), 9.875));
+  t('expr toggles', evalExpr('max(0, ceil(H/toggle_spc) - 1)', { H: 10, toggle_spc: 2 }) === 4);
+  t('expr quoted inches', near(evalExpr('24"'), 2));
+  t('expr precedence', evalExpr('2 + 3 * 4') === 14);
+  let threw = false; try { evalExpr('nope(1)'); } catch (_) { threw = true; }
+  t('expr rejects unknown fn', threw);
+  threw = false; try { evalExpr('W + 1', {}); } catch (_) { threw = true; }
+  t('expr rejects unknown name', threw);
+  threw = false; try { evalExpr('1/0'); } catch (_) { threw = true; }
+  t('expr rejects /0', threw);
+
+  // --- inference ---
+  const inf = (d, u) => inferStock(d, u, '');
+  let s = inf('1x3x16 #1 Pine', 'ft');
+  t('infer 1x3x16', s && s.kind === 'linear' && s.nominal === '1x3' && s.len === 16, JSON.stringify(s));
+  s = inf('3/4 4x8 MDF', 'sht');
+  t('infer 3/4 4x8 MDF', s && s.kind === 'sheet' && s.w === 4 && s.h === 8 && s.thick === '3/4', JSON.stringify(s));
+  s = inf('3/4x4x8 Pine CDX Sheathing', 'sht');
+  t('infer 3/4x4x8 sheet', s && s.kind === 'sheet' && s.w === 4 && s.h === 8, JSON.stringify(s));
+  s = inf('2x4x8 Spruce, stud grade', 'pc');
+  t('infer stud by the piece', s && s.kind === 'linear' && s.nominal === '2x4' && s.len === 8, JSON.stringify(s));
+  s = inf('1/4 5x12 MDF', 'sht');
+  t('infer 5x12 sheet', s && s.kind === 'sheet' && s.w === 5 && s.h === 12, JSON.stringify(s));
+  s = inf('19mm 4x8 Poplar G1S Bessmer', 'sht');
+  t('infer mm thickness', s && s.kind === 'sheet' && s.thick === '19mm', JSON.stringify(s));
+  s = inf('Titebond 3', 'pail');
+  t('infer consumable -> null', s === null, JSON.stringify(s));
+  s = inf('1x12 Rough Pine', 'ft');
+  t('infer nominal without length flags review', s && s.kind === 'linear' && s.len === null && stockNeedsReview(s), JSON.stringify(s));
+
+  // --- sheets ---
+  t('panelsPerSheet 4x8 on 4x8', panelsPerSheet(4, 8, 4, 8) === 1);
+  t('panelsPerSheet 4x10 on 4x8 = 0', panelsPerSheet(4, 10, 4, 8) === 0);
+  t('panelsPerSheet 2x4 on 4x8 = 4', panelsPerSheet(2, 4, 4, 8) === 4);
+  t('panelsPerSheet rotates', panelsPerSheet(8, 4, 4, 8) === 1);
+
+  // --- nesting ---
+  let n = nest1D([{ len: 4, qty: 4 }], [{ len: 16, cost: 13.76, itemId: 'a' }]);
+  t('nest 4×4ft into 16ft respects kerf', n.sticks === 2, 'sticks=' + n.sticks);
+  n = nest1D([{ len: 10, qty: 3 }], [{ len: 16, cost: 13.76, itemId: 'a' }]);
+  t('nest 3×10ft = 3 sticks', n.sticks === 3, 'sticks=' + n.sticks);
+  n = nest1D([{ len: 3.9, qty: 4 }], [{ len: 16, cost: 1, itemId: 'a' }]);
+  t('nest 4×3.9ft = 1 stick', n.sticks === 1, 'sticks=' + n.sticks);
+  const noReuse = nest1D([{ len: 3.9, qty: 4 }], [{ len: 16, cost: 1, itemId: 'a' }], { reuse: false });
+  t('offcut reuse actually fires', noReuse.sticks > n.sticks, 'reuse=' + n.sticks + ' vs none=' + noReuse.sticks);
+  n = nest1D([{ len: 4, qty: 2 }, { len: 12, qty: 1 }],
+    [{ len: 12, cost: 10, itemId: 'a' }, { len: 16, cost: 13, itemId: 'b' }]);
+  t('nest picks among stock lengths', n.sticks <= 2, 'sticks=' + n.sticks);
+  t('nest never yields over 100%', n.yield <= 1 + 1e-9, 'yield=' + n.yield);
+  n = nest1D([{ len: 20, qty: 1 }], [{ len: 16, cost: 13, itemId: 'a' }]);
+  t('nest flags an over-long piece', n.tooLong.length === 1 && n.sticks === 0);
+
+  // --- the arithmetic that matters: Hollywood flat ×8 @ 4'0 × 10'0 ---
+  const rec = builtinRecipes()[0];
+  const binds = { frame: { type: 'class', key: 'k1' }, skin: { type: 'class', key: 'k2' },
+    screws: { type: 'item', itemId: 'i1' } };
+  const ex = expandRecipe(rec, { W: 4, H: 10, toggle_spc: 2 }, binds, 8);
+  const part = (name) => ex.lines.find(l => l.label.includes(name));
+  const rails = part('Rail'), stiles = part('Stile'), tog = part('Toggle'), skin = part('Skin'), scr = part('Screws');
+  t('flat: 16 rails @ 4ft',
+    rails && rails.demand.pieces[0].qty === 16 && near(rails.demand.pieces[0].len, 4),
+    rails && rails.demand.pieces[0].qty + ' @ ' + rails.demand.pieces[0].len);
+  t("flat: 24 stiles @ 9'-10½\"",
+    stiles && stiles.demand.pieces[0].qty === 24 && near(stiles.demand.pieces[0].len, 10 - 0.125),
+    stiles && stiles.demand.pieces[0].qty + ' @ ' + fmtLen(stiles.demand.pieces[0].len, 'frac'));
+  t("flat: 32 toggles @ 3'-10½\"",
+    tog && tog.demand.pieces[0].qty === 32 && near(tog.demand.pieces[0].len, 4 - 0.125),
+    tog && tog.demand.pieces[0].qty + ' @ ' + fmtLen(tog.demand.pieces[0].len, 'frac'));
+  t('flat: 8 skins 4×10', skin && skin.demand.panels[0].qty === 8 &&
+    near(skin.demand.panels[0].w, 4) && near(skin.demand.panels[0].h, 10));
+  t('flat: 0.432 M screws', scr && near(scr.demand.bulk === undefined ? scr.demand.qty : 0, 0.432, 1e-9),
+    scr && String(scr.demand.qty));
+  const linLf = rails.demand.pieces[0].qty * 4 + stiles.demand.pieces[0].qty * 9.875 + tog.demand.pieces[0].qty * 3.875;
+  t('flat: 435.0 lf of 1x3', near(linLf, 64 + 237 + 124, 0.001), linLf.toFixed(2) + ' lf');
+  t('flat: no expansion problems', ex.problems.length === 0, ex.problems.join('; '));
+
+  return T;
+}
+
+function openTests() {
+  const T = runTests();
+  const bad = T.filter(x => !x.ok);
+  modal('<div class="modal md"><div class="mhead"><h2>Self-check</h2>' +
+    '<span class="dim">' + (T.length - bad.length) + ' / ' + T.length + ' passed</span>' +
+    '<div class="spring"></div><button class="btn" data-close>close</button></div><div class="mbody">' +
+    '<pre class="log">' + T.map(x => (x.ok ? '<b class="ok">  ok</b>  ' : '<b class="no">FAIL</b>  ') +
+      esc(x.name) + (x.detail && !x.ok ? '\n        got: ' + esc(x.detail) : '')).join('\n') + '</pre>' +
+    '<div class="field" style="margin-top:12px"><label>End-to-end: verify a supplier PDF</label>' +
+    '<input type="file" id="tFile" accept="application/pdf,.pdf">' +
+    '<div class="hint">Reads the file and reports what it found, so you can hold the document ' +
+    'next to the screen. Nothing is imported.</div></div><pre class="log" id="tOut" style="display:none"></pre>' +
+    '</div></div>', (v) => {
+      $('#tFile', v).onchange = async () => {
+        const f = $('#tFile', v).files[0]; if (!f) return;
+        const out = $('#tOut', v); out.style.display = ''; out.textContent = 'reading…';
+        try {
+          const r = await parseVendorPDF(await f.arrayBuffer());
+          const need = r.items.filter(i => stockNeedsReview(inferStock(i.description, i.unit, i.code))).length;
+          const kinds = { linear: 0, sheet: 0, unit: 0 };
+          for (const i of r.items) kinds[(inferStock(i.description, i.unit, i.code) || { kind: 'unit' }).kind]++;
+          out.textContent =
+            'pages with text     ' + r.pages + '\n' +
+            'priced rows read    ' + r.rowCount + '\n' +
+            'repeated SKUs       ' + r.dupes.length + (r.dupes.length ? '  (' + Array.from(new Set(r.dupes)).join(', ') + ')' : '') + '\n' +
+            'unique items        ' + r.items.length + '\n' +
+            'rows as printed     ' + money(r.gross) + '   <- compare to the document subtotal\n' +
+            (r.meta.subtotal != null ? 'subtotal on the doc ' + money(r.meta.subtotal) +
+              (near(r.meta.subtotal, r.gross, 0.02) ? '   MATCH' : '   MISMATCH') + '\n' : '') +
+            (r.meta.tax != null ? 'tax on the doc      ' + money(r.meta.tax) + '\n' : '') +
+            'tax codes           ' + JSON.stringify(r.meta.taxRates) + '\n' +
+            'inferred            ' + kinds.linear + ' linear, ' + kinds.sheet + ' sheet, ' + kinds.unit + ' by the unit\n' +
+            'need a hand fix     ' + need + ' of ' + r.items.length +
+              (need <= r.items.length * 0.14 ? '   (within tolerance)' : '   (heuristics need work)') + '\n' +
+            'first row           ' + r.items[0].code + ' · ' + r.items[0].unit + ' · ' +
+              r.items[0].description + ' · ' + r.items[0].taxCode + ' · ' + r.items[0].price.toFixed(2) + '\n' +
+            'last row            ' + r.items[r.items.length - 1].code + ' · ' +
+              r.items[r.items.length - 1].description + ' · ' + r.items[r.items.length - 1].price.toFixed(2);
+        } catch (e) { out.textContent = 'FAILED: ' + e.message; }
+      };
+    });
+  function near(a, b, tol) { return a != null && Math.abs(a - b) < tol; }
+}
+
+/* ==================================================================
+   INIT
+   ================================================================== */
+(async function init() {
+  await load();
+  if (!DB.recipes.length) DB.recipes = builtinRecipes();
+  if (!DB.jobs.length) newJob('Untitled job');
+  State.units = DB.units || 'frac';
+  bindGlobal();
+  render();
+  setStatus(DB.catalogs.length
+    ? DB.catalogs.reduce((a, c) => a + c.items.length, 0) + ' priced rows across ' +
+      DB.vendors.length + ' vendor' + (DB.vendors.length === 1 ? '' : 's')
+    : 'no price list yet — Catalog → import');
+  if (/[?&]test\b/.test(location.search)) openTests();
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
