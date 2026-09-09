@@ -9,7 +9,10 @@ drops rows into the job.
 
 ## Run it
 
-Open `index.html` in a browser. That's it — it works from `file://`.
+**Live: https://benjaminmtran1.github.io/tally/** — installs as a PWA and runs
+with the network off, which is the version to put on a phone or a shop tablet.
+
+Locally, open `index.html` in a browser. That's it — it works from `file://`.
 
 For a stable origin (so storage survives and it installs as a PWA):
 
@@ -18,6 +21,9 @@ python3 -m http.server 8124
 ```
 
 then `http://localhost:8124/index.html`. Add `?test` to run the self-checks.
+
+Each origin keeps its own data — the Pages copy, `localhost:8124` and a
+`file://` copy do not see each other's catalogs or jobs.
 
 ## What it does
 
