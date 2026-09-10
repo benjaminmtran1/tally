@@ -49,9 +49,11 @@ estimate and it was wrong.
 
 ## Checks
 
-`index.html?test` runs 49 assertions covering the unit parser and formatter, the
-expression evaluator, stock inference, `panelsPerSheet`, and the nester (including
-that offcut reuse actually lowers the stick count). The same panel takes a PDF and
+`index.html?test` runs 64 assertions covering the unit parser and formatter, the
+expression evaluator, stock inference, `panelsPerSheet`, the 1D nester (including
+that offcut reuse actually lowers the stick count) and the 2D nester (pieces stay
+inside the sheet, never overlap each other or an offcut, rotation obeys the grain
+lock, and kerf costs the fourth exact quarter of a sheet). The same panel takes a PDF and
 reports what it found so you can hold the document next to the screen. Nothing is
 imported by that check.
 
@@ -68,6 +70,17 @@ nested   24×14' + 6×16' = 30 sticks, 432 lf, 98% nest yield
 skin     8 panels 4×10 -> 1 per 4x10 sheet -> +10% -> 9 sheets
 ```
 
+## Sheet nesting
+
+`nest2D()` is **shelf packing (first-fit decreasing height), deliberately not
+MAXRECTS.** Shelf packing produces strictly guillotine cuts — strips across the
+sheet, then crosscuts within a strip — which is how a panel saw works. It costs
+a few percent of yield and buys a layout a shop can actually follow. Don't
+"improve" it into a rectangle packer without deciding that tradeoff again.
+
+For a class with several sheet sizes, every size is nested and the cheapest one
+that holds the panels wins, so a 4′×10′ skin buys a 4×10.
+
 ## Traps
 
 - **`DecompressionStream` refuses trailing junk**, unlike zlib. A PDF stream body
@@ -83,6 +96,15 @@ skin     8 panels 4×10 -> 1 per 4x10 sheet -> +10% -> 9 sheets
   `2 * qty` in a part.
 - **The static id-check reports `par_`, `bind_`, `cmpA`, `cmpB` as missing.** They
   are built by string concatenation. False positive.
+- **Kerf decides sheet counts, and it looks like a bug when it does.** Five 4′×4′
+  decks take five 4×8 sheets, not three, because two 48″ pieces need 96⅛″ of a
+  96″ sheet. That is correct and it will not look correct. `computeJob` re-nests
+  at kerf 0 and raises `g.kerfCost` with a flag saying what cutting a kerf under
+  would save. Keep that flag — without it the number reads as broken.
+- **A job bundle reuses a local catalogue on an id match only.** Matching on
+  vendor + date instead would attach the job's lines to a catalogue whose item
+  ids differ, silently breaking every line. Duplicating a catalogue is the safe
+  failure.
 
 ## Where things are
 

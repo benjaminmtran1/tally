@@ -204,6 +204,21 @@ select.cell { background: #fff; border: 1px solid var(--border); border-radius: 
 }
 .tag.r { background: var(--primary-soft); color: var(--primary); border-color: #cadffb; }
 
+/* ============ SHEET LAYOUTS ============ */
+.sheets { display: flex; flex-wrap: wrap; gap: 12px; padding: 11px; background: var(--bg-panel); }
+.sheetfig { width: 232px; }
+.sheetfig svg { display: block; width: 100%; height: auto; background: #fff;
+  border: 1px solid var(--border); border-radius: 3px; }
+.sheetfig .cap { font-size: 10px; color: var(--text-dim); margin-top: 3px;
+  display: flex; justify-content: space-between; gap: 6px; }
+.sheetfig .cap b { color: var(--text); font-weight: 600; }
+svg .pc { fill: var(--primary-soft); stroke: var(--primary); stroke-width: .5; }
+svg .pc.rot { fill: #e7f3ea; stroke: var(--green); }
+svg .off { fill: none; stroke: var(--text-dim); stroke-width: .4; stroke-dasharray: 2 2; }
+svg .off.rack { fill: #fff8ee; stroke: var(--yellow); }
+svg text { font-family: var(--mono); fill: var(--text); }
+svg text.o { fill: var(--text-dim); }
+
 /* ============ ENTRIES STRIP ============ */
 #entries { border-top: 1px solid var(--border); background: var(--bg-panel); }
 .entry {
@@ -458,7 +473,9 @@ function fmtLenTight(ft, mode) {
     let n = Math.round(frac * 16), d = 16;
     while (n && n % 2 === 0) { n /= 2; d /= 2; }
     if (n === d) { n = 0; whole += 1; }
-    return (ft < 0 ? '-' : '') + whole + (n ? (VULGAR[n / d] || (n + '/' + d)) : '') + '"';
+    // a bare fraction reads as 1/8", not 0 1/8"
+    return (ft < 0 ? '-' : '') + ((whole || !n) ? whole : '') +
+      (n ? (VULGAR[n / d] || (n + '/' + d)) : '') + '"';
   }
   return fmtLen(ft, mode);
 }
@@ -957,12 +974,16 @@ function bumpCatalog(cat) { if (cat) { cat._rev = (cat._rev || 0) + 1; cat._cls 
    to prove it is doing something.
    ================================================================== */
 
-const KERF = 0.125 / 12;      // 1/8" saw kerf, in feet
+const KERF = 0.125 / 12;      // 1/8" saw kerf, in feet — the default
 const EPS = 1e-6;
+// Kerf decides more than it looks like it should: two 4'0 pieces need 96 1/8"
+// of a 96" sheet, so an eighth of an inch can double a sheet count.
+const kerfOf = (job) => (job && job.kerfIn != null ? +job.kerfIn : 0.125) / 12;
 
 function nest1D(pieces, lengths, opts) {
   opts = opts || {};
   const reuse = opts.reuse !== false;
+  const KERF = opts.kerf == null ? 0.125 / 12 : opts.kerf;
   const stock = lengths.slice().sort((a, b) => a.len - b.len);
   const flat = [];
   for (const p of pieces) for (let i = 0; i < p.qty; i++) flat.push({ len: p.len, label: p.label });
@@ -1008,6 +1029,93 @@ function nest1D(pieces, lengths, opts) {
   const boughtLf = bins.reduce((a, b) => a + b.len, 0);
   return { bins, sticks: bins.length, usedLf, boughtLf,
     yield: boughtLf ? usedLf / boughtLf : 0, tooLong };
+}
+
+/* 2D: shelf packing (first-fit decreasing height).
+   Deliberately NOT MAXRECTS. Shelf packing produces strictly guillotine cuts —
+   rip the sheet into strips, then crosscut within each strip — which is how a
+   panel saw works and what makes the layout something a shop can follow. It
+   gives up a few percent of yield to stay buildable. */
+function nest2D(panels, sheet, opts) {
+  opts = opts || {};
+  const kerf = opts.kerf == null ? KERF : opts.kerf;
+  const rotate = opts.rotate !== false;
+
+  const queue = [];
+  for (const p of panels) for (let i = 0; i < p.qty; i++) queue.push({ w: p.w, h: p.h, label: p.label });
+  queue.sort((a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || (b.w * b.h) - (a.w * a.h));
+
+  const fits = (pw, ph) => pw <= sheet.w + EPS && ph <= sheet.h + EPS;
+  const tooBig = [];
+  const rest = queue.filter(p => {
+    if (fits(p.w, p.h) || (rotate && fits(p.h, p.w))) return true;
+    tooBig.push(p); return false;
+  });
+
+  const sheets = [];
+  let pending = rest;
+  while (pending.length) {
+    const shelves = [];
+    let yUsed = 0;
+    const placed = [];
+    const left = [];
+
+    for (const p of pending) {
+      const orients = rotate && Math.abs(p.w - p.h) > EPS
+        ? [{ w: p.w, h: p.h, r: false }, { w: p.h, h: p.w, r: true }]
+        : [{ w: p.w, h: p.h, r: false }];
+      let done = false;
+
+      // existing shelf first
+      for (const sh of shelves) {
+        for (const o of orients) {
+          const gap = sh.xUsed > 0 ? kerf : 0;
+          if (o.h <= sh.h + EPS && sh.xUsed + gap + o.w <= sheet.w + EPS) {
+            placed.push({ x: sh.xUsed + gap, y: sh.y, w: o.w, h: o.h, label: p.label, rotated: o.r });
+            sh.xUsed += gap + o.w;
+            done = true; break;
+          }
+        }
+        if (done) break;
+      }
+      if (done) continue;
+
+      // open a new shelf, using the shortest orientation that fits
+      const gapY = yUsed > 0 ? kerf : 0;
+      let pick = null;
+      for (const o of orients) {
+        if (o.w > sheet.w + EPS) continue;
+        if (yUsed + gapY + o.h > sheet.h + EPS) continue;
+        if (!pick || o.h < pick.h) pick = o;
+      }
+      if (!pick) { left.push(p); continue; }
+      const sh = { y: yUsed + gapY, h: pick.h, xUsed: pick.w };
+      shelves.push(sh);
+      placed.push({ x: 0, y: sh.y, w: pick.w, h: pick.h, label: p.label, rotated: pick.r });
+      yUsed = sh.y + pick.h;
+    }
+
+    // offcuts: the tail of each shelf, plus the strip below the last shelf
+    const frees = [];
+    for (const sh of shelves) {
+      const w = sheet.w - sh.xUsed - (sh.xUsed > 0 ? kerf : 0);
+      if (w > 0.02) frees.push({ x: sh.xUsed + kerf, y: sh.y, w, h: sh.h });
+    }
+    const bottom = sheet.h - yUsed - (yUsed > 0 ? kerf : 0);
+    if (bottom > 0.02) frees.push({ x: 0, y: yUsed + kerf, w: sheet.w, h: bottom });
+
+    const usedArea = placed.reduce((a, r) => a + r.w * r.h, 0);
+    sheets.push({ placed, frees, usedArea });
+
+    if (left.length === pending.length) break;   // nothing fits: bail rather than spin
+    pending = left;
+  }
+
+  const usedArea = sheets.reduce((a, s) => a + s.usedArea, 0);
+  const boughtArea = sheets.length * sheet.w * sheet.h;
+  return { sheets, count: sheets.length, usedArea, boughtArea,
+    yield: boughtArea ? usedArea / boughtArea : 0, tooBig,
+    rackable: sheets.reduce((a, s) => a + s.frees.filter(f => f.w >= 1 && f.h >= 1).length, 0) };
 }
 
 function panelsPerSheet(pw, ph, sw, sh) {
@@ -1093,7 +1201,8 @@ function computeJob(job) {
         g.needLabel = fmtLf(g.need); g.buyLabel = '—';
       } else {
         const lengths = pool.map(i => ({ len: i.stock.len, cost: stickCost(i), itemId: i.id }));
-        const nested = g.pieces.length ? nest1D(g.pieces, lengths, { reuse: job.reuseOffcuts !== false })
+        const nested = g.pieces.length ? nest1D(g.pieces, lengths,
+            { reuse: job.reuseOffcuts !== false, kerf: kerfOf(job) })
           : { bins: [], sticks: 0, usedLf: 0, boughtLf: 0, yield: 0, tooLong: [] };
         g.nest = nested;
         if (nested.tooLong.length)
@@ -1134,24 +1243,45 @@ function computeJob(job) {
     } else if (g.kind === 'sheet') {
       const pool = (g.cls ? g.cls.items : [g.item]).filter(i => i.stock && i.stock.kind === 'sheet');
       const counts = new Map();
-      let needSf = 0;
-      for (const p of g.panels) {
-        needSf += p.w * p.h * p.qty;
+      const rotate = job.allowRotate !== false;
+      let needSf = g.panels.reduce((a, p) => a + p.w * p.h * p.qty, 0);
+
+      if (g.panels.length && pool.length) {
+        // Nest the whole class's panels onto each candidate sheet size and buy
+        // the cheapest that can actually hold them.
         let best = null;
+        const kerf = kerfOf(job);
         for (const it of pool) {
-          const pps = panelsPerSheet(p.w, p.h, it.stock.w, it.stock.h);
-          if (!pps) continue;
-          const cand = { it, pps, waste: (it.stock.w * it.stock.h) / pps - p.w * p.h, cost: it.price / pps };
-          if (!best || cand.cost < best.cost - 1e-9) best = cand;
+          const res = nest2D(g.panels, { w: it.stock.w, h: it.stock.h }, { rotate, kerf });
+          const cand = { it, res, cost: res.count * it.price };
+          if (!best ||
+              cand.res.tooBig.length < best.res.tooBig.length ||
+              (cand.res.tooBig.length === best.res.tooBig.length && cand.cost < best.cost - 1e-9)) best = cand;
         }
-        if (!best) {
+        g.nest2 = best.res;
+        g.sheetItem = best.it;
+        for (const p of best.res.tooBig) {
           g.flags.push('A ' + fmtLenTight(p.w) + ' × ' + fmtLenTight(p.h) +
-            ' panel does not fit any sheet in this class — it needs a seam, or a bigger sheet.');
-          continue;
+            ' panel does not fit a ' + best.it.stock.w + '×' + best.it.stock.h +
+            ' sheet — it needs a seam, or a bigger sheet.');
         }
-        const sheets = Math.ceil((p.qty * wf) / best.pps - EPS);
-        counts.set(best.it.id, (counts.get(best.it.id) || 0) + sheets);
+        counts.set(best.it.id, Math.ceil(best.res.count * wf - EPS));
+
+        // The near-miss that will otherwise look like a bug: panels that miss
+        // sharing a sheet purely by the saw kerf.
+        if (best.res.count > 0 && kerf > 0) {
+          const ideal = nest2D(g.panels, { w: best.it.stock.w, h: best.it.stock.h },
+            { rotate, kerf: 0 });
+          if (ideal.count < best.res.count) {
+            g.kerfCost = best.res.count - ideal.count;
+            g.flags.push(g.kerfCost + ' of these ' + best.res.count + ' sheets exist only because of the ' +
+              fmtLenTight(kerf) + ' saw kerf — the panels miss sharing a sheet by less than one cut. ' +
+              'Cutting them a kerf under, or setting kerf to 0 for oversize stock, drops it to ' +
+              ideal.count + '.');
+          }
+        }
       }
+
       if (g.bulk > 0) {
         const it = pool.slice().sort((a, b) =>
           (a.price / (a.stock.w * a.stock.h)) - (b.price / (b.stock.w * b.stock.h)))[0];
@@ -1159,8 +1289,10 @@ function computeJob(job) {
           needSf += g.bulk;
           counts.set(it.id, (counts.get(it.id) || 0) +
             Math.ceil((g.bulk * wf) / (it.stock.w * it.stock.h) - EPS));
+          g.areaOnly = true;      // a bulk square-footage entry is not a layout
         }
       }
+
       for (const [itemId, count] of counts) {
         const it = itemById(cat, itemId);
         g.buys.push({ item: it, count, each: it.price, amount: count * it.price });
@@ -1172,7 +1304,7 @@ function computeJob(job) {
       const boughtSf = g.buys.reduce((a, b) => a + b.count * b.item.stock.w * b.item.stock.h, 0);
       g.yield = boughtSf ? needSf / boughtSf : null;
       g.offcutSf = boughtSf - needSf;
-      g.areaOnly = true;
+      if (g.nest2) g.rackable = g.nest2.rackable;
     } else {
       const it = g.item;
       const need = g.bulk;
@@ -1657,8 +1789,15 @@ function viewCutList() {
   if (!CALC || !CALC.catalog) return '<div class="empty"><b>Nothing to cut</b>Load a price list and build a job first.</div>';
   const lin = CALC.groups.filter(g => g.kind === 'linear' && g.nest && g.nest.bins.length);
   const sh = CALC.groups.filter(g => g.kind === 'sheet' && g.buys.length);
+  const job = activeJob();
+  const rot = job.allowRotate !== false;
   let h = '<div class="shead"><h2>Cut list</h2><span class="n">' +
     lin.length + ' nested · ' + sh.length + ' sheet</span><div class="spring"></div>' +
+    '<span class="ctl"><label>kerf</label><input class="mini" id="kerfIn" style="width:52px" value="' +
+      esc(job.kerfIn != null ? job.kerfIn : '1/8') + '"><span class="dim">"</span></span>' +
+    '<button class="btn' + (rot ? ' on' : '') + '" data-act="rotate" ' +
+    'title="Off when grain direction matters — panels then keep their drawn orientation">' +
+    (rot ? '↻ rotation allowed' : '↻ grain locked') + '</button>' +
     '<button class="btn" data-act="csv">export CSV</button></div><div class="tblwrap">';
   if (!lin.length && !sh.length) h += '<div class="empty">No pieces yet — run a recipe to get cut lengths.</div>';
 
@@ -1680,23 +1819,81 @@ function viewCutList() {
     h += '</tbody></table>';
   }
   for (const g of sh) {
-    h += '<table class="grid"><thead><tr><th colspan="4">' + esc(g.label) +
-      ' — ' + esc(g.buyLabel) + ' · area estimate, not a layout</th></tr>' +
+    const it = g.sheetItem || (g.buys[0] ? g.buys[0].item : null);
+    const n2 = g.nest2;
+    h += '<table class="grid"><thead><tr><th colspan="4">' + esc(g.label) + ' — ' + esc(g.buyLabel) +
+      (n2 ? ' · ' + it.stock.w + '×' + it.stock.h + ' · nested yield ' +
+        Math.round(n2.yield * 100) + '% · guillotine strips'
+          : ' · area estimate, not a layout') + '</th></tr>' +
       '<tr><th>Panel</th><th class="num" style="width:60px">Qty</th>' +
       '<th style="width:110px">From sheet</th><th class="num" style="width:96px">Per sheet</th></tr></thead><tbody>';
     for (const p of g.panels) {
-      const it = g.buys[0] ? g.buys[0].item : null;
       const pps = it ? panelsPerSheet(p.w, p.h, it.stock.w, it.stock.h) : 0;
+      const rotFits = it && !pps && panelsPerSheet(p.h, p.w, it.stock.w, it.stock.h);
       h += '<tr><td>' + esc(p.label || 'panel') + ' &nbsp;<span class="dim">' +
         fmtLenTight(p.w) + ' × ' + fmtLenTight(p.h) + '</span></td>' +
         '<td class="num">' + p.qty + '</td>' +
         '<td class="dim">' + (it ? it.stock.w + '×' + it.stock.h : '—') + '</td>' +
-        '<td class="num' + (pps ? '' : ' dim') + '">' + (pps || 'does not fit') + '</td></tr>';
+        '<td class="num' + (pps || rotFits ? '' : ' dim') + '">' +
+          (pps || rotFits || 'does not fit') + '</td></tr>';
     }
     h += '</tbody></table>';
+    if (n2 && n2.sheets.length) {
+      h += '<div class="sheets">';
+      n2.sheets.forEach((s2, i) => {
+        const area = it.stock.w * it.stock.h;
+        h += '<div class="sheetfig">' + sheetSVG(it.stock.w, it.stock.h, s2) +
+          '<div class="cap"><b>#' + String(i + 1).padStart(2, '0') + '</b>' +
+          '<span>' + s2.placed.length + ' pc</span>' +
+          '<span>' + Math.round(s2.usedArea / area * 100) + '%</span></div></div>';
+      });
+      const spare = g.sheets - n2.count;
+      if (spare > 0) h += '<div class="sheetfig" style="display:flex;align-items:center;' +
+        'justify-content:center;border:1.5px dashed var(--accent3);border-radius:3px;' +
+        'min-height:120px;color:var(--text-dim);text-align:center;font-size:10.5px">+' + spare +
+        ' uncut spare<br>waste allowance at ' + g.wastePct + '%</div>';
+      h += '</div>';
+    }
   }
   h += '</div>';
   return h;
+}
+
+function sheetSVG(sheetW, sheetH, s2) {
+  const long = Math.max(sheetW, sheetH), short = Math.min(sheetW, sheetH);
+  const flip = sheetH > sheetW;                  // display transpose only
+  const W = long * 12, H = short * 12;
+  const map = (r) => flip
+    ? { x: r.y * 12, y: r.x * 12, w: r.h * 12, h: r.w * 12 }
+    : { x: r.x * 12, y: r.y * 12, w: r.w * 12, h: r.h * 12 };
+  let g = '';
+  for (const f of s2.frees) {
+    const r = map(f);
+    const rack = f.w >= 1 && f.h >= 1;
+    g += '<rect class="off' + (rack ? ' rack' : '') + '" x="' + r.x.toFixed(1) + '" y="' + r.y.toFixed(1) +
+      '" width="' + r.w.toFixed(1) + '" height="' + r.h.toFixed(1) + '"/>';
+    if (rack && r.w > 16 && r.h > 7)
+      g += '<text class="o" x="' + (r.x + r.w / 2).toFixed(1) + '" y="' + (r.y + r.h / 2 + 1.6).toFixed(1) +
+        '" font-size="4" text-anchor="middle">offcut ' + fmtLenTight(f.w, 'frac') + '×' + fmtLenTight(f.h, 'frac') + '</text>';
+  }
+  for (const pl of s2.placed) {
+    const r = map(pl);
+    g += '<rect class="pc' + (pl.rotated ? ' rot' : '') + '" x="' + r.x.toFixed(1) + '" y="' + r.y.toFixed(1) +
+      '" width="' + r.w.toFixed(1) + '" height="' + r.h.toFixed(1) + '"/>';
+    const dims = fmtLenTight(pl.w, 'frac') + '×' + fmtLenTight(pl.h, 'frac');
+    if (r.w > 22 && r.h > 12) {
+      g += '<text x="' + (r.x + r.w / 2).toFixed(1) + '" y="' + (r.y + r.h / 2 - 1).toFixed(1) +
+        '" font-size="4.4" text-anchor="middle">' + esc(pl.label || 'panel') + '</text>' +
+        '<text class="o" x="' + (r.x + r.w / 2).toFixed(1) + '" y="' + (r.y + r.h / 2 + 4.4).toFixed(1) +
+        '" font-size="4" text-anchor="middle">' + dims + (pl.rotated ? ' ↻' : '') + '</text>';
+    } else if (r.w > 16 && r.h > 6) {
+      g += '<text class="o" x="' + (r.x + r.w / 2).toFixed(1) + '" y="' + (r.y + r.h / 2 + 1.5).toFixed(1) +
+        '" font-size="3.6" text-anchor="middle">' + dims + '</text>';
+    }
+  }
+  return '<svg viewBox="-1 -1 ' + (W + 2) + ' ' + (H + 2) + '" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="none" stroke="#1c2430" stroke-width=".8"/>' +
+    g + '</svg>';
 }
 
 function cutListCSV() {
@@ -2527,6 +2724,13 @@ function wirePane() {
       }, 120);
     };
   }
+  const ki = $('#kerfIn');
+  if (ki) ki.onchange = () => {
+    const j = activeJob(); if (!j) return;
+    const v = parseNumFrac(ki.value);
+    j.kerfIn = (v == null || v < 0) ? 0.125 : v;
+    touchJob(); render();
+  };
   const sa = $('#selAll');
   if (sa) sa.onchange = () => {
     const cat = activeCatalog();
@@ -2624,6 +2828,11 @@ function paneAction(a) {
     return render();
   }
   if (a === 'selnone') { State.catSel.clear(); return render(); }
+  if (a === 'rotate') {
+    const j = activeJob();
+    j.allowRotate = j.allowRotate === false;
+    touchJob(); return render();
+  }
   if (a === 'bulklen' || a === 'bulksize') {
     const cat = activeCatalog();
     const sel = cat.items.filter(i => State.catSel.has(i.id));
@@ -2741,6 +2950,8 @@ function runTests() {
   t("fmtLen whole", fmtLen(10, 'frac') === '10\'-0"', fmtLen(10, 'frac'));
   t('fmtLen dec', fmtLen(4.54, 'dec') === "4.54'", fmtLen(4.54, 'dec'));
   t('fmtLenTight sub-foot', fmtLenTight(0.125, 'frac') === '1½"', fmtLenTight(0.125, 'frac'));
+  t('fmtLenTight bare fraction', fmtLenTight(0.125 / 12, 'frac') === '⅛"', fmtLenTight(0.125 / 12, 'frac'));
+  t('fmtLenTight zero', fmtLenTight(0, 'frac') === '0"', fmtLenTight(0, 'frac'));
   t('round trip 1/16', near(parseLen(fmtLen(9 + 10.5 / 12, 'frac')), 9 + 10.5 / 12, 1e-6));
 
   // --- expressions ---
@@ -2796,6 +3007,42 @@ function runTests() {
   t('nest never yields over 100%', n.yield <= 1 + 1e-9, 'yield=' + n.yield);
   n = nest1D([{ len: 20, qty: 1 }], [{ len: 16, cost: 13, itemId: 'a' }]);
   t('nest flags an over-long piece', n.tooLong.length === 1 && n.sticks === 0);
+
+  // --- 2D nesting ---
+  let n2 = nest2D([{ w: 4, h: 8, qty: 8, label: 'skin' }], { w: 4, h: 8 });
+  t('nest2D 8× 4x8 skins on 4x8 = 8 sheets', n2.count === 8 && n2.tooBig.length === 0, 'count=' + n2.count);
+  t('nest2D full sheets are 100% yield', Math.abs(n2.yield - 1) < 1e-9, 'yield=' + n2.yield);
+  n2 = nest2D([{ w: 4, h: 10, qty: 8 }], { w: 4, h: 8 });
+  t('nest2D 4x10 panel cannot come off a 4x8', n2.tooBig.length === 8 && n2.count === 0, 'tooBig=' + n2.tooBig.length);
+  n2 = nest2D([{ w: 4, h: 10, qty: 8 }], { w: 4, h: 10 });
+  t('nest2D 4x10 panel fits a 4x10 sheet', n2.count === 8 && n2.tooBig.length === 0, 'count=' + n2.count);
+  n2 = nest2D([{ w: 2, h: 4, qty: 4 }], { w: 4, h: 8 });
+  t('nest2D kerf costs the 4th exact quarter', n2.count === 2, 'count=' + n2.count);
+  n2 = nest2D([{ w: 2, h: 4, qty: 4 }], { w: 4, h: 8 }, { kerf: 0 });
+  t('nest2D with no kerf packs all four', n2.count === 1, 'count=' + n2.count);
+  n2 = nest2D([{ w: 8, h: 4, qty: 1 }], { w: 4, h: 8 }, { rotate: true });
+  t('nest2D rotates a panel to fit', n2.count === 1 && n2.sheets[0].placed[0].rotated, JSON.stringify(n2.tooBig));
+  n2 = nest2D([{ w: 8, h: 4, qty: 1 }], { w: 4, h: 8 }, { rotate: false });
+  t('nest2D respects grain lock', n2.tooBig.length === 1 && n2.count === 0, 'count=' + n2.count);
+  n2 = nest2D([{ w: 2, h: 4, qty: 3 }, { w: 1, h: 2, qty: 6 }], { w: 4, h: 8 });
+  t('nest2D never exceeds 100% yield', n2.yield <= 1 + 1e-9, 'yield=' + n2.yield);
+  t('nest2D places every piece it accepted',
+    n2.sheets.reduce((a, x) => a + x.placed.length, 0) === 3 + 6,
+    n2.sheets.reduce((a, x) => a + x.placed.length, 0) + ' of 9');
+  t('nest2D pieces stay inside the sheet', n2.sheets.every(sx =>
+    sx.placed.every(r => r.x >= -1e-9 && r.y >= -1e-9 && r.x + r.w <= 4 + 1e-6 && r.y + r.h <= 8 + 1e-6)), '');
+  t('nest2D pieces do not overlap', n2.sheets.every(sx => {
+    for (let a = 0; a < sx.placed.length; a++) for (let b = a + 1; b < sx.placed.length; b++) {
+      const p = sx.placed[a], q = sx.placed[b];
+      if (p.x < q.x + q.w - 1e-6 && q.x < p.x + p.w - 1e-6 &&
+          p.y < q.y + q.h - 1e-6 && q.y < p.y + p.h - 1e-6) return false;
+    }
+    return true;
+  }), '');
+  t('nest2D offcuts do not overlap pieces', n2.sheets.every(sx =>
+    sx.frees.every(f => sx.placed.every(r =>
+      !(f.x < r.x + r.w - 1e-6 && r.x < f.x + f.w - 1e-6 &&
+        f.y < r.y + r.h - 1e-6 && r.y < f.y + f.h - 1e-6)))), '');
 
   // --- the arithmetic that matters: Hollywood flat ×8 @ 4'0 × 10'0 ---
   const rec = builtinRecipes()[0];

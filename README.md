@@ -39,9 +39,16 @@ and **jobs → import job** to move work between them.
   The nester chooses among them.
 - **Recipes.** Parts are data: params in, cut pieces out, evaluated by a small
   parser (no `eval`). Ships with Hollywood Flat, Stud Wall and Platform.
-- **1D nesting** with kerf and offcut reuse, so the buy list is what you actually
-  put on the truck. Sheet goods are counted by *fit*, not just area: a 4′×10′ skin
-  will pick a 4×10 sheet rather than pretend two 4×8s cover it.
+- **Nesting in both dimensions.** Sticks pack into real stock lengths with kerf
+  and offcut reuse. Sheets get an actual layout — which panel falls where, drawn
+  to scale, with the offcuts marked and the rackable ones highlighted. Panels
+  rotate unless you lock the grain, and the nester picks the cheapest sheet size
+  that can hold them, so a 4′×10′ skin buys a 4×10 rather than pretending two
+  4×8s cover it.
+- **Kerf is a dial, because it decides more than it should.** Two 4′0″ pieces need
+  96⅛″ of a 96″ sheet, so an eighth of an inch can double a sheet count. When
+  that happens the app says so and tells you what cutting a kerf under would
+  save, instead of quietly charging you for the extra sheets.
 - **Both waste dials** — a job-wide percentage with per-material and per-line
   overrides. The mark beside each figure says which one won.
 - **Named jobs and snapshots**, so you can freeze the numbers, change an
@@ -52,8 +59,10 @@ and **jobs → import job** to move work between them.
 
 ## What it does not do
 
-- **No 2D sheet nesting.** Sheet counts are `ceil(qty ÷ panels-per-sheet)` with a
-  fits / does-not-fit check, and the UI says `area est` where that's what it is.
+- **Sheet layouts are guillotine strips, not optimal packing.** Shelf packing
+  gives up a few percent of yield to stay something a panel saw can follow: rip
+  the sheet into strips, then crosscut within each strip. A bulk square-footage
+  entry is still just area, and says `area est`.
 - **No cross-vendor comparison yet.** Each vendor's list stands alone. The class
   key is built so it can widen later without a rewrite.
 - **No import from SetDraft / DraftSmith yet.** The CSV export here already matches
