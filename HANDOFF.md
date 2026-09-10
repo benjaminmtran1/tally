@@ -101,6 +101,13 @@ that holds the panels wins, so a 4′×10′ skin buys a 4×10.
   96″ sheet. That is correct and it will not look correct. `computeJob` re-nests
   at kerf 0 and raises `g.kerfCost` with a flag saying what cutting a kerf under
   would save. Keep that flag — without it the number reads as broken.
+- **The service worker must revalidate in `fetch`, not `install`.** `sw.js` is
+  usually byte-identical between deploys, so the browser never reinstalls it —
+  a plain cache-first shell with a "bump the CACHE constant" rule pins every
+  returning visitor to the first version they ever loaded, and the bump gets
+  forgotten. It is stale-while-revalidate now: serve from cache, compare the
+  fetched shell, and `postMessage` the page when it genuinely differs. The page
+  offers a reload; it never swaps the app out under someone mid-estimate.
 - **A job bundle reuses a local catalogue on an id match only.** Matching on
   vendor + date instead would attach the job's lines to a catalogue whose item
   ids differ, silently breaking every line. Duplicating a catalogue is the safe

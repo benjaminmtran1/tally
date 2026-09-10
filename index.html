@@ -334,6 +334,7 @@ kbd {
 
 <div id="status">
   <span id="stMsg">ready</span>
+  <button id="stUpdate" class="btn hide" style="padding:1px 7px">new version — reload</button>
   <div class="spring"></div>
   <span id="stStore" class="dim"></span>
 </div>
@@ -3130,8 +3131,21 @@ function openTests() {
       DB.vendors.length + ' vendor' + (DB.vendors.length === 1 ? '' : 's')
     : 'no price list yet — Catalog → import');
   if (/[?&]test\b/.test(location.search)) openTests();
+
+  // The shell revalidates in the background; a new build is OFFERED, never
+  // swapped in under someone mid-estimate.
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (!e.data || e.data.type !== 'tally-update') return;
+      const b = $('#stUpdate');
+      b.classList.remove('hide');
+      b.onclick = async () => {
+        if (State.dirty) await persist();
+        location.reload();
+      };
+      toast('A new version is ready — reload when you are at a good stopping point.', 5000);
+    });
   }
 })();
 </script>
