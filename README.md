@@ -23,7 +23,8 @@ python3 -m http.server 8124
 then `http://localhost:8124/index.html`. Add `?test` to run the self-checks.
 
 Each origin keeps its own data — the Pages copy, `localhost:8124` and a
-`file://` copy do not see each other's catalogs or jobs.
+`file://` copy do not see each other's catalogs or jobs. Use **jobs → export**
+and **jobs → import job** to move work between them.
 
 ## What it does
 
@@ -45,6 +46,9 @@ Each origin keeps its own data — the Pages copy, `localhost:8124` and a
   overrides. The mark beside each figure says which one won.
 - **Named jobs and snapshots**, so you can freeze the numbers, change an
   assumption, and compare.
+- **Jobs export and import as a single file.** Each origin keeps its own
+  IndexedDB, so a bundle carries the job *and* the catalogue it prices against
+  — a job alone means nothing on another machine.
 
 ## What it does not do
 

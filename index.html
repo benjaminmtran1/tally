@@ -91,6 +91,17 @@ input.mini:focus { outline: none; border-color: var(--primary); background: #fff
 .btn.pri { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn.pri:hover { filter: brightness(1.08); }
 .btn.danger { color: var(--accent); }
+.btn.on { background: var(--primary-soft); border-color: #cadffb; color: var(--primary); font-weight: 600; }
+#bulkbar {
+  position: sticky; top: 31px; z-index: 3;
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 6px 11px; background: var(--primary-soft);
+  border-bottom: 1px solid #cadffb; font-size: 11px;
+}
+#bulkbar .grp { display: flex; align-items: center; gap: 5px; }
+#bulkbar label { color: var(--text-dim); font-size: 10px; letter-spacing: .6px; text-transform: uppercase; }
+table.grid td.pick, table.grid th.pick { width: 24px; padding-left: 9px; }
+table.grid input[type=checkbox] { margin: 0; vertical-align: middle; }
 .btn:disabled { opacity: .4; cursor: default; }
 
 /* ============ TABS ============ */
@@ -480,6 +491,8 @@ const State = {
   units: 'frac',
   search: '',
   catFilter: '',
+  catNeedsOnly: false,
+  catSel: new Set(),
   selCatalogId: null,
   selRecipeId: null,
   dirty: false,
@@ -1547,25 +1560,48 @@ function viewCatalog() {
     'Drop in a supplier PDF, paste a spreadsheet, or add rows by hand.<br>' +
     '<button class="btn pri" data-act="import" style="margin-top:12px">Import a price list</button></div>';
   const q = State.search.toLowerCase();
-  const items = cat.items.filter(i => !q ||
-    (i.code + ' ' + i.description + ' ' + i.unit).toLowerCase().includes(q));
+  const items = cat.items.filter(i =>
+    (!q || (i.code + ' ' + i.description + ' ' + i.unit).toLowerCase().includes(q)) &&
+    (!State.catNeedsOnly || stockNeedsReview(i.stock)));
   const needing = cat.items.filter(i => stockNeedsReview(i.stock)).length;
   let h = '<div class="shead"><h2>Catalog</h2>' +
     '<input class="search" id="catSearch" placeholder="filter…" value="' + esc(State.search) + '">' +
-    '<span class="n">' + items.length + ' / ' + cat.items.length +
-    (needing ? ' · ' + needing + ' need a stock size' : '') + '</span>' +
+    '<span class="n">' + items.length + ' / ' + cat.items.length + '</span>' +
+    (needing ? '<button class="btn' + (State.catNeedsOnly ? ' on' : '') + '" data-act="needonly">' +
+      needing + ' need a stock size</button>' : '') +
     '<div class="spring"></div>' +
     (DB.catalogs.length > 1 ? catalogPicker() : '') +
     '<button class="btn" data-act="newitem">+ row</button>' +
     '<button class="btn" data-act="import">import</button></div>';
+
+  // bulk bar — the only sane way to fix thirteen random-length rows
+  const sel = items.filter(i => State.catSel.has(i.id));
+  if (sel.length) {
+    const nLin = sel.filter(i => i.stock && i.stock.kind === 'linear').length;
+    const nSht = sel.filter(i => i.stock && i.stock.kind === 'sheet').length;
+    h += '<div id="bulkbar"><b>' + sel.length + ' selected</b>' +
+      '<span class="dim">' + nLin + ' linear · ' + nSht + ' sheet</span>' +
+      (nLin ? '<div class="grp"><label>set length</label>' +
+        '<input class="mini" id="bulkLen" value="16\'" style="width:62px">' +
+        '<button class="btn" data-act="bulklen">apply to ' + nLin + '</button></div>' : '') +
+      (nSht ? '<div class="grp"><label>set sheet</label>' +
+        '<input class="mini" id="bulkSize" value="4x8" style="width:62px">' +
+        '<button class="btn" data-act="bulksize">apply to ' + nSht + '</button></div>' : '') +
+      '<div class="spring"></div><button class="btn" data-act="selnone">clear</button></div>';
+  }
+
+  const allSel = items.length && items.every(i => State.catSel.has(i.id));
   h += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+    '<th class="pick"><input type="checkbox" id="selAll"' + (allSel ? ' checked' : '') + '></th>' +
     '<th style="width:100px">Code</th><th style="width:36px">U</th><th>Description</th>' +
     '<th style="width:132px">Stock</th><th style="width:150px">Class</th>' +
     '<th class="num" style="width:44px">Tax</th><th class="num" style="width:54px">W%</th>' +
     '<th class="num" style="width:76px">Price</th><th style="width:26px"></th></tr></thead><tbody>';
   for (const i of items) {
     const need = stockNeedsReview(i.stock);
-    h += '<tr data-item="' + i.id + '">' +
+    h += '<tr data-item="' + i.id + '"' + (State.catSel.has(i.id) ? ' class="sel"' : '') + '>' +
+      '<td class="pick"><input type="checkbox" data-pick="' + i.id + '"' +
+        (State.catSel.has(i.id) ? ' checked' : '') + '></td>' +
       '<td class="code ed" data-f="code">' + esc(i.code) + '</td>' +
       '<td class="dim ed" data-f="unit">' + esc(i.unit) + '</td>' +
       '<td class="ed" data-f="description">' + esc(i.description) + '</td>' +
@@ -1577,6 +1613,8 @@ function viewCatalog() {
       '<td class="num ed" data-f="price">' + i.price.toFixed(2) + '</td>' +
       '<td><button class="x" data-delitem="' + i.id + '">✕</button></td></tr>';
   }
+  if (!items.length) h += '<tr><td colspan="10" class="dim" style="padding:16px">' +
+    (State.catNeedsOnly ? 'Nothing left needing a stock size.' : 'No rows match that filter.') + '</td></tr>';
   h += '</tbody></table></div>';
   return h;
 }
@@ -1680,6 +1718,68 @@ function cutListCSV() {
     const s = String(c);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }).join(',')).join('\n');
+}
+
+/* ---------- job export / import ----------
+   Each origin keeps its own IndexedDB, so the Pages copy, localhost and a
+   file:// copy never see each other. A bundle carries the job AND the
+   catalogue it prices against — a job alone is meaningless elsewhere. */
+function slug(str) {
+  return String(str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '').slice(0, 50) || 'job';
+}
+
+function exportJobBundle(jobId) {
+  const j = jobById(jobId);
+  if (!j) return;
+  const cat = catalogById(j.catalogId);
+  const ven = cat ? vendorById(cat.vendorId) : null;
+  const ids = new Set();
+  for (const l of j.lines) if (l.recipeId) ids.add(l.recipeId);
+  for (const sn of j.snapshots || []) for (const l of sn.lines || []) if (l.recipeId) ids.add(l.recipeId);
+  const bundle = { app: 'tally', v: 1, exportedAt: new Date().toISOString(),
+    job: j, catalog: cat || null, vendor: ven || null,
+    recipes: DB.recipes.filter(r => ids.has(r.id)) };
+  download(slug(j.name) + '-' + todayISO() + '.tally.json',
+    JSON.stringify(bundle, null, 2), 'application/json');
+  toast('Exported "' + j.name + '"');
+}
+
+function importJobBundle(text) {
+  let b;
+  try { b = JSON.parse(text); } catch (_) { return toast('That is not a Tally file'); }
+  if (!b || b.app !== 'tally' || !b.job) return toast('That is not a Tally job export');
+
+  if (b.vendor && !vendorById(b.vendor.id)) {
+    const same = DB.vendors.find(v => v.name.toLowerCase() === String(b.vendor.name).toLowerCase());
+    if (same) { if (b.catalog) b.catalog.vendorId = same.id; }
+    else DB.vendors.push(b.vendor);
+  }
+  // Reuse a local catalogue ONLY on an id match. Item ids are what the job's
+  // lines point at, so a same-looking catalogue with different ids would
+  // silently break every line.
+  let catId = b.job.catalogId;
+  if (b.catalog) {
+    if (catalogById(b.catalog.id)) catId = b.catalog.id;
+    else { DB.catalogs.unshift(b.catalog); bumpCatalog(b.catalog); catId = b.catalog.id; }
+  }
+  for (const r of b.recipes || []) if (!recipeById(r.id)) DB.recipes.push(r);
+
+  const job = b.job;
+  job.catalogId = catId;
+  if (jobById(job.id)) { job.id = uid(); job.name = job.name + ' (imported)'; }
+  job.snapshots = job.snapshots || [];
+  DB.jobs.unshift(job);
+  DB.activeJobId = job.id;
+  save(); render();
+  toast('Imported "' + job.name + '" — ' + job.lines.length + ' entries');
+}
+
+function pickFile(accept, onText) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = accept;
+  inp.onchange = async () => { const f = inp.files[0]; if (f) onText(await f.text(), f); };
+  inp.click();
 }
 
 function download(name, text, mime) {
@@ -2278,7 +2378,8 @@ function openJobs() {
       '<td class="num dim">' + j.lines.length + '</td>' +
       '<td class="num dim">' + (j.snapshots || []).length + '</td>' +
       '<td class="num">' + money(t.total) + '</td>' +
-      '<td><button class="btn" data-dupjob="' + j.id + '">dup</button> ' +
+      '<td><button class="btn" data-expjob="' + j.id + '">export</button> ' +
+      '<button class="btn" data-dupjob="' + j.id + '">dup</button> ' +
       '<button class="x" data-deljob="' + j.id + '">✕</button></td></tr>';
   }).join('');
   const snaps = (cur && cur.snapshots || []).map(s =>
@@ -2288,19 +2389,24 @@ function openJobs() {
     '<button class="x" data-delsnap="' + s.id + '">✕</button></td></tr>').join('');
   modal(
    '<div class="modal md"><div class="mhead"><h2>Jobs</h2><div class="spring"></div>' +
-   '<button class="btn pri" id="jbNew">+ new job</button><button class="btn" data-close>close</button></div>' +
+   '<button class="btn pri" id="jbNew">+ new job</button>' +
+   '<button class="btn" id="jbImport">import job</button>' +
+   '<button class="btn" data-close>close</button></div>' +
    '<div class="mbody flush"><table class="grid"><thead><tr><th>Name</th><th style="width:86px">Modified</th>' +
    '<th class="num" style="width:56px">Lines</th><th class="num" style="width:56px">Snaps</th>' +
-   '<th class="num" style="width:88px">Total</th><th style="width:86px"></th></tr></thead><tbody>' +
+   '<th class="num" style="width:88px">Total</th><th style="width:150px"></th></tr></thead><tbody>' +
    (rows || '<tr><td colspan="6" class="dim" style="padding:14px">no jobs</td></tr>') + '</tbody></table>' +
    (snaps ? '<div class="shead" style="position:static"><h2>Snapshots of ' + esc(cur.name) + '</h2></div>' +
      '<table class="grid"><tbody>' + snaps + '</tbody></table>' : '') +
    '</div><div class="mfoot"><span class="dim">Snapshots freeze the numbers so you can change assumptions and compare.</span></div></div>',
   (v) => {
     $('#jbNew', v).onclick = () => { newJob('Untitled job'); closeModal(); save(); render(); };
+    $('#jbImport', v).onclick = () => pickFile('.json,application/json',
+      (text) => { closeModal(); importJobBundle(text); });
     v.addEventListener('click', (e) => {
       const d = (s) => { const el = e.target.closest('[' + s + ']'); return el ? el.getAttribute(s) : null; };
       let id;
+      if ((id = d('data-expjob'))) { exportJobBundle(id); return; }
       if ((id = d('data-dupjob'))) {
         const src = jobById(id);
         const copy = JSON.parse(JSON.stringify(src));
@@ -2410,13 +2516,27 @@ function wirePane() {
   const pane = $('#pane');
 
   const cs = $('#catSearch');
-  if (cs) cs.oninput = () => {
-    State.search = cs.value;
-    const cat = activeCatalog(); const q = State.search.toLowerCase();
-    $$('#pane tbody tr[data-item]').forEach(tr => {
-      const it = itemById(cat, tr.dataset.item);
-      tr.style.display = (!q || (it.code + ' ' + it.description + ' ' + it.unit).toLowerCase().includes(q)) ? '' : 'none';
-    });
+  if (cs) {
+    cs.oninput = () => {
+      State.search = cs.value;
+      clearTimeout(cs._t);
+      cs._t = setTimeout(() => {
+        render();
+        const el = $('#catSearch');
+        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      }, 120);
+    };
+  }
+  const sa = $('#selAll');
+  if (sa) sa.onchange = () => {
+    const cat = activeCatalog();
+    const q = State.search.toLowerCase();
+    const shown = cat.items.filter(i =>
+      (!q || (i.code + ' ' + i.description + ' ' + i.unit).toLowerCase().includes(q)) &&
+      (!State.catNeedsOnly || stockNeedsReview(i.stock)));
+    if (sa.checked) shown.forEach(i => State.catSel.add(i.id));
+    else shown.forEach(i => State.catSel.delete(i.id));
+    render();
   };
   const cp = $('#catPick');
   if (cp) cp.onchange = () => { const j = activeJob(); if (j) { j.catalogId = cp.value; touchJob(); } render(); };
@@ -2426,6 +2546,11 @@ function wirePane() {
     if (act) return paneAction(act.dataset.act);
 
     let el;
+    if ((el = e.target.closest('[data-pick]'))) {
+      const id = el.getAttribute('data-pick');
+      if (State.catSel.has(id)) State.catSel.delete(id); else State.catSel.add(id);
+      return render();
+    }
     if ((el = e.target.closest('[data-waste]'))) {
       const g = CALC.groups.find(x => x.key === el.dataset.waste);
       return editCell(el, g.wastePct, (v) => {
@@ -2493,6 +2618,37 @@ function wirePane() {
 }
 
 function paneAction(a) {
+  if (a === 'needonly') {
+    State.catNeedsOnly = !State.catNeedsOnly;
+    State.catSel.clear();
+    return render();
+  }
+  if (a === 'selnone') { State.catSel.clear(); return render(); }
+  if (a === 'bulklen' || a === 'bulksize') {
+    const cat = activeCatalog();
+    const sel = cat.items.filter(i => State.catSel.has(i.id));
+    let n = 0;
+    if (a === 'bulklen') {
+      const len = parseLen($('#bulkLen').value);
+      if (!(len > 0)) return toast('Could not read that length');
+      for (const i of sel) {
+        if (!i.stock || i.stock.kind !== 'linear') continue;
+        i.stock.len = Math.round(len * 1000) / 1000; n++;
+      }
+      toast('Set ' + fmtLenTight(len) + ' on ' + n + ' row' + (n === 1 ? '' : 's'));
+    } else {
+      const m = String($('#bulkSize').value).match(/^\s*(\d{1,2})\s*[x×]\s*(\d{1,2})\s*$/i);
+      if (!m) return toast('Give a sheet size like 4x8');
+      for (const i of sel) {
+        if (!i.stock || i.stock.kind !== 'sheet') continue;
+        i.stock.w = Math.min(+m[1], +m[2]);
+        i.stock.h = Math.max(+m[1], +m[2]);
+        i.stock.assumedSize = false; n++;
+      }
+      toast('Set ' + m[1] + '×' + m[2] + ' on ' + n + ' row' + (n === 1 ? '' : 's'));
+    }
+    bumpCatalog(cat); save(); return render();
+  }
   if (a === 'import') return openImport();
   if (a === 'add') return openAdd();
   if (a === 'run') return openRun();
